@@ -139,11 +139,19 @@ def verify(P: Invariant, ast: Tree, Q: Invariant, linv: Invariant) -> bool:
 
     if solver.check() == unsat:
         # print(">> The program is verified.")
-        return True
+        return True, None
     else:
         # print(">> The program is NOT verified.")
-        print("Counterexample:", solver.model())
-        return False
+        print("Counterexample:", str(solver.model()) )
+        return False, solver
+
+def extract_model_assignments(solver):
+    model = solver.model()
+    assignments = {}
+    for var in model:
+        assignments[str(var)] = model[var]
+    
+    return assignments
 
 def main():
     # example program
