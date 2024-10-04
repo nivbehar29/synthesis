@@ -11,19 +11,24 @@ from wp import *
 class Synthesizer:
     def __init__(self, program, pvars):
         self.pvars = pvars
-        self.program = program
+
+        self.orig_program = program
+        self.holes_program = None
+        self.holes = []  # List of holes collected from the AST
+
         self.inputs = []  # List of input examples
         self.outputs = []   # List of output examples
-        self.holes = []  # List of holes collected from the AST
+        
         self.P = []  # Preconditions
         self.Q = []  # Postconditions
 
     def process_holes(self):
         """Replaces all occurrences of '??' in the program string with unique hole variables."""
+        self.holes_program = self.orig_program
         hole_counter = 0
-        while '??' in self.program:
+        while '??' in self.holes_program:
             hole_var = f"hole_{hole_counter}"  # Create a unique hole variable
-            self.program = self.program.replace('??', hole_var, 1)  # Replace only the first occurrence of '??'
+            self.holes_program = self.holes_program.replace('??', hole_var, 1)  # Replace only the first occurrence of '??'
             self.pvars.append(hole_var)  # Add the hole variable to pvars
             hole_counter += 1  # Increment the hole counter for uniqueness
 
@@ -32,70 +37,79 @@ class Synthesizer:
         self.inputs.append(input)
         self.outputs.append(output)
 
+    def find_holes(self, ast, P, Q, linv):
+        if ast is not None:
+            wp = WP(ast)
+            wp_stmt = wp.wp(ast, Q, linv)
+            VC = Implies(P(wp.env), wp_stmt(wp.env))
 
-    def verify(self, preconditions, postconditions, sketch_program):
-        """Verifies the correctness of the sketch program using Z3 based on preconditions and postconditions."""
-        s = Solver()
-        
-        # Create a fresh state for each example
-        for precond, postcond in zip(preconditions, postconditions):
-            state_before = {var: Int(var) for var in self.pvars}
-            state_after = {var: Int(var + '_after') for var in self.pvars}
+            solver = Solver()
+            solver.add(VC)
 
-            # Add precondition to the solver
-            s.add(precond(state_before))
+            if solver.check() == unsat:
+                print(">> The program is NOT verified.")
+            else:
+                print(">> The program is verified.")
+                print("holes examples: ", solver.model())
 
-            # Apply the sketch (simulated or real)
-            # NOTE: sketch_program is expected to modify state_before in place to simulate execution
-            sketch_program(state_before)
+    def verify(self, ast, P, Q, linv):
+        if ast is not None:
+            wp = WP(ast)
+            wp_stmt = wp.wp(ast, Q, linv)
+            VC = Implies(P(wp.env), wp_stmt(wp.env))
 
-            # Add postcondition to the solver
-            s.add(Not(postcond(state_before)))  # Looking for a counterexample
+            solver = Solver()
+            solver.add(Not(VC))
 
-        if s.check() == sat:
-            print("Verification failed, counterexample found.")
-            return False
-        else:
-            print("Program verified successfully.")
-            return True
+            if solver.check() == unsat:
+                print(">> The program is verified.")
+            else:
+                print(">> The program is Not verified.")
+                print("Counterexample: ", solver.model())
 
-    def synthesize_holes(self, ast, sketch_program):
-        """Synthesizes hole values for the given program sketch using input-output examples."""
-        self.collect_holes(ast)  # Collect the holes in the AST
-        preconditions, postconditions = self.create_conditions(self.inputs, self.outputs)
-        return self.verify(preconditions, postconditions, sketch_program)
+    def generate_IO_program(self):
+        all_IO_program = ""
+        iter = 1
+        # each exampke input \ output is of the form [input_ex_1, input_ex_2, ...], [output_ex_1, output_ex_2, ...]
+        for input_ex, output_ex in zip(self.inputs, self.outputs):
+            ex_subprogram = ""
 
-def find_holes(ast, P, Q, linv):
-    if ast is not None:
-        wp = WP(ast)
-        wp_stmt = wp.wp(ast, Q, linv)
-        VC = Implies(P(wp.env), wp_stmt(wp.env))
+            # each input_ex is of the form [(var_1, value_1), (var_2, value_2), ...]
+            inputs_str = ""
+            for input in input_ex:
+                input_str = input[0] + " := " + str(input[1]) + " ; "
+                inputs_str += input_str
+            
+            # each output_ex is of the form [(var_1, value_1), (var_2, value_2), ...]
+            outputs_str = ""
+            iter_output = 1
+            for output in output_ex:
+                output_str = "if " + output[0] + " != " + str(output[1]) + " then all_outputs_sat := 0 else skip"
+                extra_semicolon = ""
+                if iter_output != len(output_ex):
+                    extra_semicolon = " ; "
+                outputs_str += output_str + extra_semicolon
+                iter_output += 1
 
-        solver = Solver()
-        #solver.add(VC)
-        solver.add((VC))
+            extra_semicolon = ""
+            if iter != len(self.inputs):
+                extra_semicolon = " ; "
 
-        if solver.check() == unsat:
-            print(">> The program is NOT verified.")
-        else:
-            print(">> The program is verified.")
-            print("holes examples: ", solver.model())
+            ex_subprogram = inputs_str + self.holes_program + " ; " + outputs_str + extra_semicolon
+            all_IO_program = all_IO_program + ex_subprogram
 
-def verify(ast, P, Q, linv):
-    if ast is not None:
-        wp = WP(ast)
-        wp_stmt = wp.wp(ast, Q, linv)
-        VC = Implies(P(wp.env), wp_stmt(wp.env))
+            iter += 1
 
-        solver = Solver()
-        #solver.add(VC)
-        solver.add(Not(VC))
+        all_IO_program = "all_outputs_sat := 1 ; " + all_IO_program
 
-        if solver.check() == unsat:
-            print(">> The program is verified.")
-        else:
-            print(">> The program is Not verified.")
-            print("Counterexample: ", solver.model())
+        return all_IO_program
+    
+    def synth_IO_program(self, all_IO_program):
+        P = lambda d: d["all_outputs_sat"] == 1
+        Q = lambda d: d["all_outputs_sat"] == 1
+        linv = lambda d: True
+        ast = parse(all_IO_program)
+        self.find_holes(ast, P, Q, linv)
 
 def main():
 
@@ -138,15 +152,14 @@ def main():
 
 ## end of counter example synthesis
 
-    pvars = ["x, a, b, d, c1, c2, hole_1, hole_2, all_outputs_sat"]
-    orig_program = "c1 := ?? ; c2 := ?? ; a := c1 * x ; b := c2 - 1 ; a := a + b; c := x * c1 "
-    new_program = "all_outputs_sat := 1 ; " \
-                  "x := 0 ; c1 := hole_1 ; c2 := hole_2 ; a := c1 * x ; b := c2 - 1 ; a := a + b; c := x * 2 ; if a != c then all_outputs_sat := 0 else skip ; " \
-                  "x := 1 ; c1 := hole_1 ; c2 := hole_2 ; a := c1 * x ; b := c2 - 1 ; a := a + b; c := x * 2 ; if a != c then all_outputs_sat := 0 else skip"
-    print(new_program)
-    P = lambda d: d["all_outputs_sat"] == 1
-    Q = lambda d: d["all_outputs_sat"] == 1
-    linv = lambda d: True
+    orig_program = "c1 := ?? ; c2 := ?? ; a := c1 * x ; b := c2 - 1 ; a := a + b; c := x * 2 ; if a != c then d := 0 else d := 1"
+    # synth.add_example([("x", 0)], [("d", 1)])
+    # synth.add_example([("x", 1)], [("d", 1)])
+    
+    # example for verifier giving d := 1 as input (additional input)
+    #orig_program = "c1 := ?? ; c2 := ?? ; a := c1 * x ; b := c2 - 1 ; a := a + b; c := x * 2 ; if a != c then d := 0 else skip"
+    # synth.add_example([("x", 0)], [("d", 1)])
+    # synth.add_example([("x", 1)], [("d", 0)])
 
     # pvars = ["x, a, b, d, c1, c2"]
     # new_program = "c1 := 0 ; c2 := 2 ; a := c1 * x ; b := c2 - 1 ; a := a + b; c := x + x ; if a = c then d := 1 else d := 0"
@@ -155,24 +168,34 @@ def main():
     # linv = lambda d: True
 
     linv = lambda d: True
-    synth = Synthesizer(new_program, pvars)
+    synth = Synthesizer(orig_program, pvars)
+    synth.process_holes() # Replace all occurrences of '??' with unique hole variables
 
-    #print(synth.program)
+    # here add examples one by one
+    synth.add_example([("x", 0)], [("d", 1)])
+    synth.add_example([("x", 1)], [("d", 1)])
 
-    synth.process_holes()
+    all_IO_program = synth.generate_IO_program()
+
+    print("I/O Program:")
+    print(all_IO_program)
+
+    synth.synth_IO_program(all_IO_program)
 
     #print(synth.pvars)
     #print(synth.program)
 
-    ast_orig = parse(new_program)
-    print("original program: ")
-    print(str(ast_orig))
+    # ast_orig = parse(new_program)
+    # print("original program: ")
+    # print(str(ast_orig))
 
-    ast = parse(synth.program)
-    print("program with holes variables: ")
-    print(str(ast))
+    # ast = parse(synth.program)
+    # print("program with holes variables: ")
+    # print(str(ast))
 
-    verify(ast, P, Q, linv)
+
+
+    #verify(ast, P, Q, linv)
     #find_holes(ast, P, Q, linv)
 
     # if ast is not None:
