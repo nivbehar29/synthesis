@@ -194,7 +194,12 @@ class Synthesizer:
             for i in range(len(holes)):
                 for j in range(len(outputs)):
                     prev_q = copy.deepcopy(bound_conditions[j])
-                    bound_conditions[j] = lambda d, hole_key=holes[i], q=prev_q: And(q(d), And(d[hole_key] < upper_bound, d[hole_key] > lower_bound))
+                    bound_conditions[j] = lambda d, hole_key=holes[i], q=prev_q: And(q(d), And(d[hole_key] <= upper_bound, d[hole_key] >= lower_bound))
+
+        for j in range(len(outputs)):            
+            orig_p = copy.deepcopy(P[j])
+            P_holes[j] = lambda d, p = orig_p, bc = bound_conditions[j]: And(bc(d), p(d))
+
 
         holes_conditions = lambda d: False
 
@@ -280,7 +285,8 @@ class Synthesizer:
                     # prev_q = Q_holes[j]
                     orig_q = copy.deepcopy(Q[j])
                     # Q_holes[j] = lambda d, q=orig_q: And(q(d), Not(holes_conditions(d)))
-                    Q_holes[j] = lambda d, q = orig_q, bc = bound_conditions[j]: And(bc(d), And(q(d), Not(holes_conditions(d))))
+                    # Q_holes[j] = lambda d, q = orig_q, bc = bound_conditions[j]: And(bc(d), And(q(d), Not(holes_conditions(d))))
+                    Q_holes[j] = lambda d, q = orig_q: And(q(d), Not(holes_conditions(d)))
 
                     
 

@@ -73,7 +73,7 @@ def linear_case_2():
     output_examples = [[("d", 1)],
                        [("d", 1)]]
 
-    output_program = get_io_program(orig_program, inputs_examples, output_examples, disable_prints, -100, 100)
+    output_program = get_io_program(orig_program, inputs_examples, output_examples, disable_prints, -4, 50)
 
     assertion = output_program == expected_program
     return assert_with_color(assertion, output_program, expected_program)
@@ -127,7 +127,7 @@ def multiple_ios_case_3():
     assertion = output_program == expected_program
     return assert_with_color(assertion, output_program, expected_program)
 
-def no_inputs_case_1():
+def no_inputs_case():
     orig_program =     "c1 := ?? ; c2 := ?? ; c3 := ??"
     expected_program = "c1 := 1 ; c2 := 2 ; c3 := 3"
 
@@ -136,6 +136,58 @@ def no_inputs_case_1():
     output_examples = [[("c1", 1), ("c2", 2), ("c3", 3)]]
 
     output_program = get_io_program(orig_program, inputs_examples, output_examples, disable_prints, -100, 100)
+
+    assertion = output_program == expected_program
+    return assert_with_color(assertion, output_program, expected_program)
+
+def bound_case_1():
+    orig_program =     "c1 := ?? ; x1 := c1"
+    expected_program = ""
+
+    inputs_examples = [[('x1', 1)]]
+    
+    output_examples = [[('x1', 1)]]
+
+    output_program = get_io_program(orig_program, inputs_examples, output_examples, disable_prints, 4, 10)
+
+    assertion = output_program == expected_program
+    return assert_with_color(assertion, output_program, expected_program)
+
+def bound_case_2():
+    orig_program =     "c1 := ?? ; x1 := c1"
+    expected_program = "c1 := 1 ; x1 := c1"
+
+    inputs_examples = [[('x1', 1)]]
+    
+    output_examples = [[('x1', 1)]]
+
+    output_program = get_io_program(orig_program, inputs_examples, output_examples, disable_prints, 1, 5)
+
+    assertion = output_program == expected_program
+    return assert_with_color(assertion, output_program, expected_program)
+
+def bound_case_3():
+    orig_program =     "c1 := ?? ; x1 := c1"
+    expected_program = "c1 := 10 ; x1 := c1"
+
+    inputs_examples = [[('x1', 1)]]
+    
+    output_examples = [[('x1', 10)]]
+
+    output_program = get_io_program(orig_program, inputs_examples, output_examples, disable_prints, 10, 10)
+
+    assertion = output_program == expected_program
+    return assert_with_color(assertion, output_program, expected_program)
+
+def bound_case_4():
+    orig_program =     "c1 := ?? ; x1 := c1"
+    expected_program = ""
+
+    inputs_examples = [[('x1', 1)]]
+    
+    output_examples = [[('x1', 10)]]
+
+    output_program = get_io_program(orig_program, inputs_examples, output_examples, disable_prints, 11, 20)
 
     assertion = output_program == expected_program
     return assert_with_color(assertion, output_program, expected_program)
@@ -219,6 +271,43 @@ def while_case_4():
     assertion = output_program == expected_program
     return assert_with_color(assertion, output_program, expected_program)
 
+def while_case_5():
+    orig_program =     "i := 0 ; while i < 3 do (a := ?? ; x := x + a ; i := i + 1)"
+    expected_program = "i := 0 ; while i < 3 do (a := 3 ; x := x + a ; i := i + 1)"
+    linv = None
+    unroll_limit = 10
+
+    inputs_examples = [[("x", 1)],
+                       [("x", 2)]]
+
+    output_examples = [[("x", 10)],
+                       [("x", 11)]]
+
+    output_program = get_io_program(orig_program, inputs_examples, output_examples, disable_prints, 0, 10, linv, unroll_limit)
+
+    assertion = output_program == expected_program
+    return assert_with_color(assertion, output_program, expected_program)
+
+def while_case_6():
+    orig_program =     "i := 0 ; while i < 3 do (a := ?? ; b := ?? ; x := b + a ; i := i + 1)"
+    expected_program = ["i := 0 ; while i < 3 do (a := 0 ; b := 3 ; x := b + a ; i := i + 1)",
+                        "i := 0 ; while i < 3 do (a := 1 ; b := 2 ; x := b + a ; i := i + 1)",
+                        "i := 0 ; while i < 3 do (a := 2 ; b := 1 ; x := b + a ; i := i + 1)",
+                        "i := 0 ; while i < 3 do (a := 3 ; b := 0 ; x := b + a ; i := i + 1)"]
+    linv = None
+    unroll_limit = 10
+
+    inputs_examples = [[("x", 1)],
+                       [("x", 2)]]
+
+    output_examples = [[("x", 3)],
+                       [("x", 3)]]
+
+    output_program = get_io_program(orig_program, inputs_examples, output_examples, disable_prints, 1, 2, linv, unroll_limit)
+
+    assertion = output_program in expected_program
+    return assert_with_color(assertion, output_program, expected_program)
+
 def pbe_tests():
     print("pbe tests")
 
@@ -234,8 +323,12 @@ def pbe_tests():
         multiple_ios_case_3,
     ]
 
-    no_inputs_cases = [
-        no_inputs_case_1,
+    aux_cases = [
+        # no_inputs_case, # TODO : Fix this case
+        bound_case_1,
+        bound_case_2,
+        bound_case_3,
+        bound_case_4,
     ]
 
     dond_care_cases = [
@@ -247,12 +340,14 @@ def pbe_tests():
         while_case_2,
         while_case_3,
         while_case_4,
+        while_case_5,
+        while_case_6,
     ]
 
     test_cases = []
     test_cases += linear_cases
     test_cases += multiple_ios_cases
-    # test_cases += no_inputs_cases
+    test_cases += aux_cases
     test_cases += dond_care_cases
     test_cases += while_cases
 
