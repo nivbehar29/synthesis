@@ -69,3 +69,109 @@ class WhileParser:
 
 def parse(program_text: str) -> typing.Optional[Tree]:
     return WhileParser()(program_text)
+
+def unroll_while(tree: Tree, unroll_limit: int = 7) -> Tree:
+    """
+    Recursively unroll 'while' statements in the AST, replacing them
+    with 'if' statements up to the unroll_limit.
+
+    Args:
+        tree (Tree): The AST of the program.
+        unroll_limit (int): The number of times to unroll the 'while' loop.
+
+    Returns:
+        Tree: A modified AST with unrolled 'while' loops.
+    """
+    if tree.root == "while":  # Found a while loop
+        cond = tree.subtrees[0]  # The condition part
+        body = tree.subtrees[1]  # The body of the while loop
+        
+        # We will create a nested sequence of 'if' statements
+        unrolled_if = Tree("if", [cond, body, Tree("skip", [])])
+        
+        # Chain the if-statements up to the unroll limit
+        for _ in range(unroll_limit - 1):
+            unrolled_if = Tree("if", [cond, body, unrolled_if])
+
+        return unrolled_if
+    
+    # Recursively traverse and unroll in the subtrees
+    return Tree(tree.root, [unroll_while(subtree, unroll_limit) for subtree in tree.subtrees])
+
+def parse_and_unroll(program: str, unroll_limit: int = 7) -> Tree:
+    """
+    Parses the program string and unrolls all 'while' loops up to a set limit.
+    
+    Args:
+        program (str): The program code as a string.
+        unroll_limit (int): The number of times to unroll the 'while' loops.
+
+    Returns:
+        Tree: The modified AST with unrolled 'while' loops.
+    """
+    ast = parse(program)
+    if ast:
+        return unroll_while(ast, unroll_limit)
+    else:
+        return None
+
+def tree_to_program(tree: Tree) -> str:
+    """
+    Converts an AST (Tree) back into a While-language program as a string.
+
+    Args:
+        tree (Tree): The abstract syntax tree of the program.
+
+    Returns:
+        str: The program in string format.
+    """
+    if tree.root == ":=":  # Assignment
+        left = tree_to_program(tree.subtrees[0])
+        right = tree_to_program(tree.subtrees[1])
+        return f"{left} := {right}"
+    
+    elif tree.root == "if":  # If-then-else statement
+        cond = tree_to_program(tree.subtrees[0])
+        then_part = tree_to_program(tree.subtrees[1])
+        else_part = tree_to_program(tree.subtrees[2])
+        return f"if {cond} then {then_part} else {else_part}"
+    
+    elif tree.root == "while":  # While loop
+        cond = tree_to_program(tree.subtrees[0])
+        body = tree_to_program(tree.subtrees[1])
+        return f"while {cond} do {body}"
+    
+    elif tree.root in ["+", "-", "*", "/", ">", "<", ">=", "<=", "==", "!=", "op"]:  # Binary operation
+        left = tree_to_program(tree.subtrees[0])
+        operator = tree.root  # Use the operator directly from the tree root
+        right = tree_to_program(tree.subtrees[1])
+        return f"({left} {operator} {right})"
+    
+    elif tree.root == "id":  # Identifier (variable)
+        return tree.subtrees[0].root
+    
+    elif tree.root == "num":  # Number (constant)
+        return str(tree.subtrees[0].root)
+    
+    elif tree.root == "skip":  # Skip statement
+        return "skip"
+    
+    elif tree.root == "hole":  # Hole (??)
+        return "??"
+    
+    else:
+        # For any other unhandled case (e.g., grouping expressions)
+        return " ".join(tree_to_program(subtree) for subtree in tree.subtrees)
+
+
+def ast_to_string(ast: Tree) -> str:
+    """
+    Wrapper function that takes an AST and returns the corresponding program string.
+
+    Args:
+        ast (Tree): The abstract syntax tree of the program.
+
+    Returns:
+        str: The program as a string.
+    """
+    return tree_to_program(ast)

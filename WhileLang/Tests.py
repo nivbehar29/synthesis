@@ -10,23 +10,23 @@ RESET = "\033[0m"
 
 disable_prints = True
 
-def synthesize_io_program(orig_program, inputs_examples, output_examples, lower_bound, upper_bound):
+def synthesize_io_program(orig_program, inputs_examples, output_examples, lower_bound, upper_bound, linv = None):
     synth = Synthesizer(orig_program)
     for ex_in, ex_out in zip(inputs_examples, output_examples):
         synth.add_io_example(ex_in, ex_out)
-    return synth.synth_IO_program(synth.orig_program, synth.inputs, synth.outputs, lower_bound, upper_bound)
+    return synth.synth_IO_program(synth.orig_program, synth.inputs, synth.outputs, lower_bound, upper_bound, linv)
 
-def get_io_program(orig_program, inputs_examples, output_examples, to_disable_print, lower_bound, upper_bound):
+def get_io_program(orig_program, inputs_examples, output_examples, to_disable_print, lower_bound, upper_bound, linv = None):
     
     output_program = None
 
     if to_disable_print:
         with open(os.devnull, 'w') as f:
             with redirect_stdout(f):
-                output_program = synthesize_io_program(orig_program, inputs_examples, output_examples, lower_bound, upper_bound)
+                output_program = synthesize_io_program(orig_program, inputs_examples, output_examples, lower_bound, upper_bound, linv)
 
     else:
-        output_program = synthesize_io_program(orig_program, inputs_examples, output_examples, lower_bound, upper_bound)
+        output_program = synthesize_io_program(orig_program, inputs_examples, output_examples, lower_bound, upper_bound, linv)
 
     return output_program
 
@@ -127,6 +127,63 @@ def multiple_ios_case_3():
     assertion = output_program == expected_program
     return assert_with_color(assertion, output_program, expected_program)
 
+def no_inputs_case_1():
+    orig_program =     "c1 := ?? ; c2 := ?? ; c3 := ??"
+    expected_program = "c1 := 1 ; c2 := 2 ; c3 := 3"
+
+    inputs_examples = [[]]
+    
+    output_examples = [[("c1", 1), ("c2", 2), ("c3", 3)]]
+
+    output_program = get_io_program(orig_program, inputs_examples, output_examples, disable_prints, -100, 100)
+
+    assertion = output_program == expected_program
+    return assert_with_color(assertion, output_program, expected_program)
+
+def dont_care_case_1():
+    orig_program =     "c1 := ?? ; c2 := ?? ; c3 := ?? ; c4 := ??"
+    expected_program = "c1 := 0 ; c2 := 2 ; c3 := 3 ; c4 := 0" # c1 and c4 can be anything
+
+    inputs_examples = [[("c1", 1)],
+                       [("c1", 5)]]
+    
+    output_examples = [[("c2", 2), ("c3", 3)],
+                       [("c2", 2), ("c3", 3)]]
+
+    output_program = get_io_program(orig_program, inputs_examples, output_examples, disable_prints, -100, 100)
+
+    assertion = output_program == expected_program
+    return assert_with_color(assertion, output_program, expected_program)
+
+def while_case_1():
+        # ## Program 6 - false
+    # program = " while x < 10 do ( x := x + 1 ; y := y + 1 ; c1 := ?? )"
+    # P = lambda d: True
+    # Q = lambda d: And(d['x'] == 10, d['y'] == 12)
+    
+
+    # orig_program =     "z:= 1 ; x := 1 ; while x < 10 do ( x := x + 1 ; y := y + 1)"
+    # expected_program = "z:= 1 ; x := 1 ; while x < 10 do ( x := x + 1 ; y := y + 1)"
+    # linv = lambda d: And(d['x'] >= 0, d['y'] >= 0)
+
+    orig_program =     "z := x ; a := 3 ; b := 6 ; while a != b do if a > b then a := a - b else b := b - a"
+    expected_program = "z := x ; a := 3 ; b := 6 ; while a != b do if a > b then a := a - b else b := b - a"
+    # linv = lambda d: And(d['a'] > 0, d['b'] > 0)
+    linv = None
+
+    inputs_examples = [[("x", 1)]]
+    
+    output_examples = [[("z", 1)]]
+    
+    
+    # linv = lambda d: True
+
+
+    output_program = get_io_program(orig_program, inputs_examples, output_examples, False, -100, 100, linv)
+
+    assertion = output_program == expected_program
+    return assert_with_color(assertion, output_program, expected_program)
+
 def pbe_tests():
     print("pbe tests")
 
@@ -136,16 +193,30 @@ def pbe_tests():
         linear_case_2,
     ]
 
-    multiple_ios = [
+    multiple_ios_cases = [
         multiple_ios_case_1,
         multiple_ios_case_2,
         multiple_ios_case_3,
+    ]
 
+    no_inputs_cases = [
+        no_inputs_case_1,
+    ]
+
+    dond_care_cases = [
+        dont_care_case_1,
+    ]
+
+    while_cases = [
+        while_case_1,
     ]
 
     test_cases = []
     # test_cases += linear_cases
-    test_cases += multiple_ios
+    # test_cases += multiple_ios_cases
+    # # test_cases += no_inputs_cases
+    # test_cases += dond_care_cases
+    test_cases += while_cases
 
     results = []
 

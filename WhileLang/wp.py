@@ -138,10 +138,10 @@ def verify(P: Invariant, ast: Tree, Q: Invariant, linv: Invariant) -> bool:
     solver.add(Not(VC))
 
     if solver.check() == unsat:
-        # print(">> The program is verified.")
+        print(">> The program is verified.")
         return True, None
     else:
-        # print(">> The program is NOT verified.")
+        print(">> The program is NOT verified.")
         print("Counterexample:", str(solver.model()) )
         return False, solver
 
@@ -155,11 +155,18 @@ def extract_model_assignments(solver):
 
 def main():
     # example program
-    pvars = ["a", "b", "i", "n"]
-    program = "a := b ; while i < n do ( a := a + 1 ; b := b + 1 )"
-    P = lambda _: True
-    Q = lambda d: d["a"] == d["b"]
-    linv = lambda d: d["a"] == d["b"]
+    # pvars = ["a", "b", "i", "n"]
+    # program = "a := b ; while i < n do ( a := a + 1 ; b := b + 1 )"
+    # P = lambda _: True
+    # Q = lambda d: d["a"] == d["b"]
+    # linv = lambda d: d["a"] == d["b"]
+
+    ## Program 4 - true
+    pvars = ["a", "b", "z", "x"]
+    program = "z := x ; a := 3 ; b := 6 ; while a != b do if a > b then a := a - b else b := b - a"
+    P = lambda d: And(True, d['x'] == 1) # And(d['a'] > 0, d['b'] > 0)
+    Q = lambda d: And(d['a'] > 0, d['a'] == d['b'])
+    linv = lambda d: And(d['a'] > 0, d['b'] > 0)
 
     #
     # Following are other programs that you might want to try

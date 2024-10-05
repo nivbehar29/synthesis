@@ -5,7 +5,7 @@ from z3 import Int, ForAll, Implies, Not, And, Solver, unsat, sat, Ast, Or
 #from WhileLang import syntax
 
 from syntax.tree import Tree
-from syntax.while_lang import parse
+from syntax.while_lang import parse, parse_and_unroll
 from wp import *
 
 import re
@@ -14,7 +14,7 @@ import copy
 class Synthesizer:
     def __init__(self, program):
         self.orig_program = program
-        self.ast_orig = parse(self.orig_program)
+        self.ast_orig = parse_and_unroll(self.orig_program)
         self.pvars = []
 
         if(self.ast_orig is not None):
@@ -67,20 +67,20 @@ class Synthesizer:
         except ValueError:
             print("Error: input/output variable not found in program")
 
-    def find_holes(self, ast, P, Q, linv):
-        if ast is not None:
-            wp = WP(ast)
-            wp_stmt = wp.wp(ast, Q, linv)
-            VC = Implies(P(wp.env), wp_stmt(wp.env))
+    # def find_holes(self, ast, P, Q, linv):
+    #     if ast is not None:
+    #         wp = WP(ast)
+    #         wp_stmt = wp.wp(ast, Q, linv)
+    #         VC = Implies(P(wp.env), wp_stmt(wp.env))
 
-            solver = Solver()
-            solver.add(VC)
+    #         solver = Solver()
+    #         solver.add(VC)
 
-            if solver.check() == unsat:
-                print(">> The program is NOT verified.")
-            else:
-                print(">> The program is verified.")
-                print("holes examples: ", solver.model())
+    #         if solver.check() == unsat:
+    #             print(">> The program is NOT verified.")
+    #         else:
+    #             print(">> The program is verified.")
+    #             print("holes examples: ", solver.model())
 
     def verify(self, ast, P, Q, linv):
         if ast is not None:
@@ -127,7 +127,7 @@ class Synthesizer:
 
         return P, Q
 
-    def fill_holes(self, holes, program, sol):
+    def fill_holes(self, program, sol):
         """Fills the holes in the program with the values from the solver model."""
         holes_to_fill_dict = self.extract_holes_from_dict(extract_model_assignments(sol))
         print("holes_to_fill_dict: ", holes_to_fill_dict)
@@ -136,6 +136,15 @@ class Synthesizer:
             # Replace each occurrence of 'key' with its corresponding 'value'
             program = program.replace(key, str(value))
         return program
+    
+    def fill_holes_with_zeros(self, program, holes: list):
+        """Fills the holes in the program with a '0'"""
+        print("hole to fill with zeroes: ", holes)
+    
+        for hole in holes:
+            # Replace each occurrence of 'key' with its corresponding 'value'
+            program = program.replace(hole, str(0))
+        return program
 
     def extract_holes_from_dict(self, dict):
         hole_pattern = re.compile(r'hole_\d+')
@@ -143,27 +152,32 @@ class Synthesizer:
         holes_dict = {k: v for k, v in dict.items() if hole_pattern.match(k)}
         return holes_dict
 
-    def synth_IO_program(self, orig_program, inputs, outputs, lower_bound = -100, upper_bound = 100):
+    def synth_IO_program(self, orig_program, inputs, outputs, lower_bound = -100, upper_bound = 100, linv = None):
         """Synthesizes a program using input-output examples."""
-        ast_orig = parse(orig_program)
+        ast_orig = parse_and_unroll(orig_program)
 
         if(self.ast_orig is None):
+            print("Error: Invalid program")
             return ""
-        # print(ast_orig)
+
         pvars = sorted(list(getPvars(ast_orig)))
         print("Pvars: ", pvars)
 
         P, Q = self.generate_conditions(inputs, outputs, pvars)
 
-        linv = lambda d: True
+        if linv is None:
+            linv = lambda d: True
         holes_program, holes = self.process_holes(orig_program) # Replace all occurrences of '??' with unique hole variables, returnes program with holes vars, and holes vars list
         print("Holes:", holes)
         holes_program = holes_program
-        ast_holes = parse(holes_program)
+        ast_holes = parse_and_unroll(holes_program)
+        if(ast_holes is None):
+            print("Error: Invalid program")
+            return ""
         # print(ast)
 
         pvars_holes = set(n for n in ast_holes.terminals if isinstance(n, str) and n != 'skip')
-        print("Pvars holes:", pvars_holes)
+        print("Pvars with holes variables:", pvars_holes)
         # env = mk_env(pvars_holes)
 
 
@@ -186,10 +200,21 @@ class Synthesizer:
             print("\n*******************************************\n")
             print("i = ", i)
             print("ast_holes: \n", ast_holes)
+
             wp = WP(ast_holes)
             wp_stmt = wp.wp(ast_holes, Q_holes[i], linv)
 
             formula = And(P_holes[i](wp.env), wp_stmt(wp.env))
+
+            # prev_q = copy.deepcopy(Q_holes[i])
+            # print("Q_holes[i]: ", Q_holes[i])
+            # new_q = lambda d: And(d['a'] > 0, d['a'] == d['b'])
+            # Q_holes[i] = lambda d, q = prev_q, new_qq = new_q: And(q(d), new_qq(d))
+
+            # Q = Q_holes[i] # new_q
+
+            # return verify(P_holes[i], ast_holes, Q_holes[i], linv)
+            # return ""
 
             solver = Solver()
             solver.add(formula)
@@ -202,7 +227,7 @@ class Synthesizer:
             # Get the model and fill the holes in the program
             model = solver.model()
             print("model: ", model)
-            filled_program = self.fill_holes(holes, holes_program, solver)
+            filled_program = self.fill_holes(holes_program, solver)
             print("filled program:")
             print(filled_program) 
 
@@ -210,7 +235,7 @@ class Synthesizer:
             solver_for_counterexample = None
             is_valid_for_all_ios = True
             for j in range(len(inputs)):
-                is_verified, solver_for_counterexample = verify(P[j], parse(filled_program), Q[j], linv = linv)
+                is_verified, solver_for_counterexample = verify(P[j], parse_and_unroll(filled_program), Q[j], linv = linv)
                 if(is_verified):
                     continue
                 else:
@@ -221,6 +246,7 @@ class Synthesizer:
 
             if(is_valid_for_all_ios):
                 print("The program is verified for all IO examples")
+                filled_program = self.fill_holes_with_zeros(filled_program, holes)
                 return filled_program
             else:
                 print("The program is not verified for all IO examples")
@@ -299,55 +325,26 @@ def test_assertions():
 
 ## end of counter example synthesis
 
-
 def main():
-    #orig_program = "c1 := ?? ; c2 := ?? ; a := c1 * x ; b := c2 - 1 ; a := a + b; c := x * 2 ; if a != c then d := 0 else skip"
-    # synth.add_example([("x", 0)], [("d", 1)])
-    # synth.add_example([("x", 1)], [("d", 1)])
-    
-    # example for verifier giving d := 1 as input (additional input)
-    orig_program = "c1 := ?? ; c2 := ?? ; a := c1 * x ; b := c2 - 1 ; a := a + b; c := x * 2 ; if a != c then d := 0 else d := 1"
-    # synth.add_example([("x", 0)], [("d", 1)])
-    # synth.add_example([("x", 1)], [("d", 0)])
 
-    # pvars = ["x, a, b, d, c1, c2"]
-    # new_program = "c1 := 0 ; c2 := 2 ; a := c1 * x ; b := c2 - 1 ; a := a + b; c := x + x ; if a = c then d := 1 else d := 0"
-    # P = lambda d: d["x"] == 0
-    # Q = lambda d: d["d"] == 1
-    # linv = lambda d: True
+    program = "while a != b do if a > b then a := a - b else b := b - a ; x := 1"
+    ast = parse(program)
+    print(ast)
 
-    # linv = lambda d: True
-    # synth = Synthesizer(orig_program)
-    # synth.process_holes() # Replace all occurrences of '??' with unique hole variables
+    # program_invert = ast_to_string(ast)
+    # print(program_invert)
 
-    # # here add examples one by one
-    # synth.add_example([("x", 0)], [("d", 0)])
-    # synth.add_example([("x", 1)], [("d", 0)])
+    # ast = parse(program_invert)
+    # print(ast)
 
+    ast_unrolled = parse_and_unroll(program)
+    print(ast_unrolled)
+    # program_invert = ast_to_string(ast_unrolled)
+    # print(program_invert)
 
-
-
-    orig_program = "c1 := ?? ; c2 := ?? ; a := c1 * x ; b := c2 - 10 ; a := a + b; c := x * 2 ; if a != c then d := 0 else d := 1"
-
-    synth = Synthesizer(orig_program)
-
-    ex1_in = [("x", 0)]
-    ex1_out = [("d", 1)]
-
-    ex2_in = [("x", 1)]
-    ex2_out = [("d", 0)]
-
-    synth.add_io_example(ex1_in, ex1_out)
-    synth.add_io_example(ex2_in, ex2_out)
-
-
-    print("pvars: ", synth.pvars)
-    print("inputs: ", synth.inputs)
-    print("outputs: ", synth.outputs)
-
-
-    #Pvars:  ['a', 'b', 'c', 'c1', 'c2', 'd', 'x']
-    synth.synth_IO_program(synth.orig_program, synth.inputs, synth.outputs)
+    # program = "if a > b then a := a - b else if a < b then b := b - a else skip"
+    # ast = parse(program)
+    # print(ast)
 
 if __name__ == "__main__":
     main()
