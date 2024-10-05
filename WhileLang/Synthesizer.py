@@ -5,7 +5,7 @@ from z3 import Int, ForAll, Implies, Not, And, Solver, unsat, sat, Ast, Or
 #from WhileLang import syntax
 
 from syntax.tree import Tree
-from syntax.while_lang import parse, parse_and_unroll
+from syntax.while_lang import parse, parse_and_unroll, tree_to_program
 from wp import *
 
 import re
@@ -14,10 +14,12 @@ import copy
 class Synthesizer:
     def __init__(self, program):
         self.orig_program = program
-        self.ast_orig = parse_and_unroll(self.orig_program)
+        self.ast_orig = parse(self.orig_program)
         self.pvars = []
 
-        if(self.ast_orig is not None):
+        if self.ast_orig is None:
+            print("Error: Invalid program")
+        else:
             self.pvars = sorted(list(getPvars(self.ast_orig)))
 
         self.inputs = []  # List of input examples
@@ -45,8 +47,11 @@ class Synthesizer:
         """ need to implement this function
             inputs/outputs are lists of tuples (var, value)"""
         
-        if(self.pvars is []):
+        if(self.pvars == []):
+            print("Error: no vars in the program")
             return
+
+        print("pvars: ", self.pvars)
 
         try:
             if inputs != [] and outputs != []:
@@ -152,9 +157,9 @@ class Synthesizer:
         holes_dict = {k: v for k, v in dict.items() if hole_pattern.match(k)}
         return holes_dict
 
-    def synth_IO_program(self, orig_program, inputs, outputs, lower_bound = -100, upper_bound = 100, linv = None):
+    def synth_IO_program(self, orig_program, inputs, outputs, lower_bound = -100, upper_bound = 100, linv = None, unroll_limit = 8):
         """Synthesizes a program using input-output examples."""
-        ast_orig = parse_and_unroll(orig_program)
+        ast_orig = parse(orig_program)
 
         if(self.ast_orig is None):
             print("Error: Invalid program")
@@ -169,14 +174,13 @@ class Synthesizer:
             linv = lambda d: True
         holes_program, holes = self.process_holes(orig_program) # Replace all occurrences of '??' with unique hole variables, returnes program with holes vars, and holes vars list
         print("Holes:", holes)
-        holes_program = holes_program
-        ast_holes = parse_and_unroll(holes_program)
-        if(ast_holes is None):
+        ast_holes_unrolled = parse_and_unroll(holes_program, unroll_limit)
+        if(ast_holes_unrolled is None):
             print("Error: Invalid program")
             return ""
         # print(ast)
 
-        pvars_holes = set(n for n in ast_holes.terminals if isinstance(n, str) and n != 'skip')
+        pvars_holes = set(n for n in ast_holes_unrolled.terminals if isinstance(n, str) and n != 'skip')
         print("Pvars with holes variables:", pvars_holes)
         # env = mk_env(pvars_holes)
 
@@ -199,10 +203,11 @@ class Synthesizer:
         while (i < len(inputs)):
             print("\n*******************************************\n")
             print("i = ", i)
-            print("ast_holes: \n", ast_holes)
+            # print("ast_holes: \n", ast_holes_unrolled)
+            # print("program unrolled: \n", tree_to_program(ast_holes_unrolled))
 
-            wp = WP(ast_holes)
-            wp_stmt = wp.wp(ast_holes, Q_holes[i], linv)
+            wp = WP(ast_holes_unrolled)
+            wp_stmt = wp.wp(ast_holes_unrolled, Q_holes[i], linv)
 
             formula = And(P_holes[i](wp.env), wp_stmt(wp.env))
 
@@ -235,7 +240,7 @@ class Synthesizer:
             solver_for_counterexample = None
             is_valid_for_all_ios = True
             for j in range(len(inputs)):
-                is_verified, solver_for_counterexample = verify(P[j], parse_and_unroll(filled_program), Q[j], linv = linv)
+                is_verified, solver_for_counterexample = verify(P[j], parse_and_unroll(filled_program, unroll_limit), Q[j], linv = linv)
                 if(is_verified):
                     continue
                 else:
@@ -246,8 +251,9 @@ class Synthesizer:
 
             if(is_valid_for_all_ios):
                 print("The program is verified for all IO examples")
-                filled_program = self.fill_holes_with_zeros(filled_program, holes)
-                return filled_program
+                final_program = self.fill_holes(holes_program, solver)
+                final_program = self.fill_holes_with_zeros(final_program, holes)
+                return final_program
             else:
                 print("The program is not verified for all IO examples")
                 # counterexample_dict = extract_model_assignments(solver)
@@ -337,7 +343,7 @@ def main():
     # ast = parse(program_invert)
     # print(ast)
 
-    ast_unrolled = parse_and_unroll(program)
+    ast_unrolled = parse_and_unroll(program, 8)
     print(ast_unrolled)
     # program_invert = ast_to_string(ast_unrolled)
     # print(program_invert)

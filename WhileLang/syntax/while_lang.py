@@ -70,35 +70,37 @@ class WhileParser:
 def parse(program_text: str) -> typing.Optional[Tree]:
     return WhileParser()(program_text)
 
-def unroll_while(tree: Tree, unroll_limit: int = 7) -> Tree:
+def unroll_while(tree: Tree, unroll_bound: int) -> Tree:
     """
-    Recursively unroll 'while' statements in the AST, replacing them
-    with 'if' statements up to the unroll_limit.
-
-    Args:
-        tree (Tree): The AST of the program.
-        unroll_limit (int): The number of times to unroll the 'while' loop.
-
-    Returns:
-        Tree: A modified AST with unrolled 'while' loops.
-    """
-    if tree.root == "while":  # Found a while loop
-        cond = tree.subtrees[0]  # The condition part
-        body = tree.subtrees[1]  # The body of the while loop
-        
-        # We will create a nested sequence of 'if' statements
-        unrolled_if = Tree("if", [cond, body, Tree("skip", [])])
-        
-        # Chain the if-statements up to the unroll limit
-        for _ in range(unroll_limit - 1):
-            unrolled_if = Tree("if", [cond, body, unrolled_if])
-
-        return unrolled_if
+    Unrolls a `while` loop in the AST by replacing it with repeated `if cond then body else skip`
+    statements without nesting, but as a sequence of separate condition checks.
     
-    # Recursively traverse and unroll in the subtrees
-    return Tree(tree.root, [unroll_while(subtree, unroll_limit) for subtree in tree.subtrees])
+    Args:
+        tree (Tree): The abstract syntax tree containing a `while` loop.
+        unroll_bound (int): The number of times to unroll the loop.
+    
+    Returns:
+        Tree: The new unrolled tree.
+    """
+    if tree.root == "while":
+        cond = tree.subtrees[0]
+        body = tree.subtrees[1]
+        
+        # Start with the first `if cond then body else skip`
+        unrolled = Tree("if", [cond, body, Tree("skip", [])])  # First unrolled iteration
+        
+        # Create a sequence of `if cond then body else skip` statements
+        for _ in range(unroll_bound - 1):
+            next_unroll = Tree("if", [cond, body, Tree("skip", [])])
+            unrolled = Tree(";", [unrolled, next_unroll])  # Sequence them with `;`
+        
+        return unrolled
+    
+    # Recursively unroll any other while loops inside the tree
+    return Tree(tree.root, [unroll_while(subtree, unroll_bound) for subtree in tree.subtrees])
 
-def parse_and_unroll(program: str, unroll_limit: int = 7) -> Tree:
+
+def parse_and_unroll(program: str, unroll_limit: int = 8) -> Tree:
     """
     Parses the program string and unrolls all 'while' loops up to a set limit.
     
@@ -158,6 +160,11 @@ def tree_to_program(tree: Tree) -> str:
     
     elif tree.root == "hole":  # Hole (??)
         return "??"
+    
+    elif tree.root == ";":  # Sequence of statements (S; S)
+        left = tree_to_program(tree.subtrees[0])
+        right = tree_to_program(tree.subtrees[1])
+        return f"{left} ; {right}"
     
     else:
         # For any other unhandled case (e.g., grouping expressions)

@@ -10,23 +10,23 @@ RESET = "\033[0m"
 
 disable_prints = True
 
-def synthesize_io_program(orig_program, inputs_examples, output_examples, lower_bound, upper_bound, linv = None):
+def synthesize_io_program(orig_program, inputs_examples, output_examples, lower_bound, upper_bound, linv = None, unroll_limit = 8):
     synth = Synthesizer(orig_program)
     for ex_in, ex_out in zip(inputs_examples, output_examples):
         synth.add_io_example(ex_in, ex_out)
-    return synth.synth_IO_program(synth.orig_program, synth.inputs, synth.outputs, lower_bound, upper_bound, linv)
+    return synth.synth_IO_program(synth.orig_program, synth.inputs, synth.outputs, lower_bound, upper_bound, linv, unroll_limit)
 
-def get_io_program(orig_program, inputs_examples, output_examples, to_disable_print, lower_bound, upper_bound, linv = None):
+def get_io_program(orig_program, inputs_examples, output_examples, to_disable_print, lower_bound, upper_bound, linv = None, unroll_limit = 8):
     
     output_program = None
 
     if to_disable_print:
         with open(os.devnull, 'w') as f:
             with redirect_stdout(f):
-                output_program = synthesize_io_program(orig_program, inputs_examples, output_examples, lower_bound, upper_bound, linv)
+                output_program = synthesize_io_program(orig_program, inputs_examples, output_examples, lower_bound, upper_bound, linv, unroll_limit)
 
     else:
-        output_program = synthesize_io_program(orig_program, inputs_examples, output_examples, lower_bound, upper_bound, linv)
+        output_program = synthesize_io_program(orig_program, inputs_examples, output_examples, lower_bound, upper_bound, linv, unroll_limit)
 
     return output_program
 
@@ -156,30 +156,65 @@ def dont_care_case_1():
     return assert_with_color(assertion, output_program, expected_program)
 
 def while_case_1():
-        # ## Program 6 - false
-    # program = " while x < 10 do ( x := x + 1 ; y := y + 1 ; c1 := ?? )"
-    # P = lambda d: True
-    # Q = lambda d: And(d['x'] == 10, d['y'] == 12)
-    
-
-    # orig_program =     "z:= 1 ; x := 1 ; while x < 10 do ( x := x + 1 ; y := y + 1)"
-    # expected_program = "z:= 1 ; x := 1 ; while x < 10 do ( x := x + 1 ; y := y + 1)"
-    # linv = lambda d: And(d['x'] >= 0, d['y'] >= 0)
-
-    orig_program =     "z := x ; a := 3 ; b := 6 ; while a != b do if a > b then a := a - b else b := b - a"
-    expected_program = "z := x ; a := 3 ; b := 6 ; while a != b do if a > b then a := a - b else b := b - a"
-    # linv = lambda d: And(d['a'] > 0, d['b'] > 0)
+    orig_program =     "while a != b do if a > b then a := a - b else b := b - a"
+    expected_program = "while a != b do if a > b then a := a - b else b := b - a"
     linv = None
 
+    inputs_examples = [[("a", 3), ("b", 6)]]
+    output_examples = [[("a", 3), ("b", 3)]]
+
+    output_program = get_io_program(orig_program, inputs_examples, output_examples, disable_prints, -100, 100, linv)
+
+    assertion = output_program == expected_program
+    return assert_with_color(assertion, output_program, expected_program)
+
+def while_case_2():
+    orig_program =     "y := ?? ; while x < y do x := x + 1"
+    expected_program = "y := 8 ; while x < y do x := x + 1"
+    linv = None
+    unroll_limit = 10
+
     inputs_examples = [[("x", 1)]]
-    
-    output_examples = [[("z", 1)]]
-    
-    
-    # linv = lambda d: True
 
+    output_examples = [[("x", 8)]]
 
-    output_program = get_io_program(orig_program, inputs_examples, output_examples, False, -100, 100, linv)
+    output_program = get_io_program(orig_program, inputs_examples, output_examples, disable_prints, -100, 100, linv, unroll_limit)
+
+    assertion = output_program == expected_program
+    return assert_with_color(assertion, output_program, expected_program)
+
+def while_case_3():
+    orig_program =     "i := 0 ; while i < ?? do (x := x * 2 ; i := i + 1)"
+    expected_program = "i := 0 ; while i < 5 do (x := x * 2 ; i := i + 1)"
+    linv = None
+    unroll_limit = 10
+
+    inputs_examples = [[("x", 0)],
+                       [("x", 1)],
+                       [("x", 2)],]
+
+    output_examples = [[("x", 0)],
+                       [("x", 32)],
+                       [("x", 64)]]
+
+    output_program = get_io_program(orig_program, inputs_examples, output_examples, disable_prints, 0, 10, linv, unroll_limit)
+
+    assertion = output_program == expected_program
+    return assert_with_color(assertion, output_program, expected_program)
+
+def while_case_4():
+    orig_program =     "i := 0 ; while i < ?? do (x := x * 2 ; i := i + 1)"
+    expected_program = ""
+    linv = None
+    unroll_limit = 10
+
+    inputs_examples = [[("x", 1)],
+                       [("x", 2)]]
+
+    output_examples = [[("x", 32)],
+                       [("x", 32)]]
+
+    output_program = get_io_program(orig_program, inputs_examples, output_examples, disable_prints, 0, 10, linv, unroll_limit)
 
     assertion = output_program == expected_program
     return assert_with_color(assertion, output_program, expected_program)
@@ -209,13 +244,16 @@ def pbe_tests():
 
     while_cases = [
         while_case_1,
+        while_case_2,
+        while_case_3,
+        while_case_4,
     ]
 
     test_cases = []
-    # test_cases += linear_cases
-    # test_cases += multiple_ios_cases
-    # # test_cases += no_inputs_cases
-    # test_cases += dond_care_cases
+    test_cases += linear_cases
+    test_cases += multiple_ios_cases
+    # test_cases += no_inputs_cases
+    test_cases += dond_care_cases
     test_cases += while_cases
 
     results = []
