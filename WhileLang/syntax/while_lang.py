@@ -10,7 +10,7 @@ __all__ = ["parse"]
 class WhileParser:
 
     TOKENS = (
-        r"(if|then|else|while|do|skip)(?![\w\d_]) "
+        r"(if|then|else|while|do|skip|assert)(?![\w\d_]) "
         r"(?P<id>[^\W\d]\w*) "
         r"(?P<num>[+\-]?\d+) "
         r"(?P<op>[!<>]=|([+\-*/<>=])) "
@@ -19,7 +19,7 @@ class WhileParser:
     )
     GRAMMAR = r"""
     S   ->   S1     |   S1 ; S
-    S1  ->   skip   |   id := E   |   if E then S else S1   |   while E do S1
+    S1  ->   skip   |   id := E   |   if E then S else S1   |   while E do S1  |   assert E
     S1  ->   ( S )
     E   ->   E0   |   E0 op E0
     E0  ->   id   |   num   |   hole
@@ -57,7 +57,7 @@ class WhileParser:
             )
         elif len(t.subtrees) == 3 and t.subtrees[0].root == "(":
             return self.postprocess(t.subtrees[1])
-        elif t.root == "S1" and t.subtrees[0].root in ["if", "while"]:
+        elif t.root == "S1" and t.subtrees[0].root in ["if", "while", 'assert']:
             return self.postprocess(Tree(t.subtrees[0].root, t.subtrees[1::2]))
         elif t.root == "num":
             return Tree(t.root, [Tree(int(t.subtrees[0].root))])  # parse ints

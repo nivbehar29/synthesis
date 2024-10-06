@@ -339,24 +339,22 @@ def test_assertions():
 
 def main():
 
-    program = "while a != b do if a > b then a := a - b else b := b - a ; x := 1"
+    program = "b := 3 ; c := 6 ; d := b + c ; assert (a = d)"
+
+    P = lambda d: d["a"] == 9
+    Q = lambda d: True
+    linv = lambda d: True
+
     ast = parse(program)
     print(ast)
 
-    # program_invert = ast_to_string(ast)
-    # print(program_invert)
+    if ast is not None:
+        print(">> Valid program.")
+        # Your task is to implement "verify"
+        verify(P, ast, Q, linv=linv)
+    else:
+        print(">> Invalid program.")
 
-    # ast = parse(program_invert)
-    # print(ast)
-
-    ast_unrolled = parse_and_unroll(program, 8)
-    print(ast_unrolled)
-    # program_invert = ast_to_string(ast_unrolled)
-    # print(program_invert)
-
-    # program = "if a > b then a := a - b else if a < b then b := b - a else skip"
-    # ast = parse(program)
-    # print(ast)
 
 if __name__ == "__main__":
     main()

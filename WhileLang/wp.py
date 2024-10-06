@@ -115,6 +115,9 @@ class WP:
                 ForAll(program_vars,
                        And(Implies(And(linv(self.env), self.eval_expr(cond, self.env)), self.wp(body, linv, linv)(self.env)),
                            Implies(And(linv(self.env), Not(self.eval_expr(cond, self.env))), Q(self.env)))))
+        elif node_type == "assert":
+            cond = subtrees[0]
+            return lambda env: And(self.eval_expr(cond, env), Q(env))
         else:
             raise ValueError(f"Unknown statement type: {node_type}")
 
