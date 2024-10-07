@@ -72,21 +72,6 @@ class Synthesizer:
         except ValueError:
             print("Error: input/output variable not found in program")
 
-    # def find_holes(self, ast, P, Q, linv):
-    #     if ast is not None:
-    #         wp = WP(ast)
-    #         wp_stmt = wp.wp(ast, Q, linv)
-    #         VC = Implies(P(wp.env), wp_stmt(wp.env))
-
-    #         solver = Solver()
-    #         solver.add(VC)
-
-    #         if solver.check() == unsat:
-    #             print(">> The program is NOT verified.")
-    #         else:
-    #             print(">> The program is verified.")
-    #             print("holes examples: ", solver.model())
-
     def verify(self, ast, P, Q, linv):
         if ast is not None:
             wp = WP(ast)
@@ -142,20 +127,35 @@ class Synthesizer:
             program = program.replace(key, str(value))
         return program
     
+    def fill_holes_dict(self, program, holes_dict):
+        """Fills the holes in the program with the values from the holes dictionary."""
+        for key, value in holes_dict.items():
+            # Replace each occurrence of 'key' with its corresponding 'value'
+            program = program.replace(key, str(value))
+        return program
+    
     def fill_holes_with_zeros(self, program, holes: list):
         """Fills the holes in the program with a '0'"""
         print("hole to fill with zeroes: ", holes)
     
+        holes_dict = {}
         for hole in holes:
             # Replace each occurrence of 'key' with its corresponding 'value'
             program = program.replace(hole, str(0))
-        return program
+            holes_dict[hole] = 0
+        return program, holes_dict
 
     def extract_holes_from_dict(self, dict):
         hole_pattern = re.compile(r'hole_\d+')
         # Extract the keys and values that match the pattern
         holes_dict = {k: v for k, v in dict.items() if hole_pattern.match(k)}
         return holes_dict
+    
+    def extract_counter_example_from_dict(self, dict):
+        hole_pattern = re.compile(r'hole_\d+')
+        # Create a new dictionary excluding keys that match the pattern
+        non_holes_dict = {k: v for k, v in dict.items() if not hole_pattern.match(k)}
+        return non_holes_dict
 
     def synth_IO_program(self, orig_program, inputs, outputs, lower_bound = -100, upper_bound = 100, linv = None, unroll_limit = 8):
         """Synthesizes a program using input-output examples."""
@@ -257,7 +257,7 @@ class Synthesizer:
             if(is_valid_for_all_ios):
                 print("The program is verified for all IO examples")
                 final_program = self.fill_holes(holes_program, solver)
-                final_program = self.fill_holes_with_zeros(final_program, holes)
+                final_program, _ = self.fill_holes_with_zeros(final_program, holes)
                 return final_program
             else:
                 print("The program is not verified for all IO examples")
@@ -294,6 +294,136 @@ class Synthesizer:
                 i = 0
 
         return ""
+    
+    def find_holes(self, ast, P, Q, linv):
+        wp = WP(ast)
+        wp_stmt = wp.wp(ast, Q, linv)
+
+        VC = And(P(wp.env), wp_stmt(wp.env))
+        
+        solver = Solver()
+        solver.add(VC)
+
+        if solver.check() == unsat:
+            print(">> The program is Not verified.")
+            return False, None
+        else:
+            print(">> The program is verified.")
+            print("holes:", str(solver.model()) )
+            return True, solver
+
+    def synth_program(self, orig_program, P, Q, linv = None):
+        ast_orig = parse(orig_program)
+
+        if(self.ast_orig is None):
+            print("Error: Invalid program")
+            return ""
+
+        pvars = sorted(list(getPvars(ast_orig)))
+        print("Pvars: ", pvars)
+
+        if linv is None:
+            linv = lambda d: True
+
+        if P is None:
+            P = lambda d: True
+
+        if Q is None:
+            Q = lambda d: True
+
+        holes_program, holes = self.process_holes(orig_program) # Replace all occurrences of '??' with unique hole variables, returnes program with holes vars, and holes vars list
+        ast_holes = parse(holes_program)
+        if(ast_holes is None):
+            print("Error: Invalid program")
+            return ""
+
+        filled_program, filled_holes_dict = self.fill_holes_with_zeros(holes_program, holes)
+        final_holes_p = lambda d: True
+
+        while(True):
+            ast_filled = parse(filled_program)
+            result, solver = verify(P, ast_filled, Q, linv=linv)
+            if result == True:
+                print("The program is verified")
+                return filled_program
+            
+            ce = self.extract_counter_example_from_dict(extract_model_assignments(solver))
+            if ce == {}:
+                print("No counter example found - each input is a counter example")
+                # ce = {'x': 0}
+
+            print("counter example dict:", ce)
+
+            inputs_p = lambda d: True
+            for input_key in ce:
+                input_p = lambda d: And(d[input_key] == ce[input_key])
+                prev_inputs_p = copy.deepcopy(inputs_p)
+                inputs_p = lambda d, p = prev_inputs_p, q = input_p: And(p(d), q(d))
+
+            holes_p = lambda d: True
+            for hole_key in filled_holes_dict:
+                hole_p = lambda d: And(d[hole_key] == filled_holes_dict[hole_key])
+                holes_p = lambda d, p = holes_p, q = hole_p: And(p(d), q(d))
+            prev_holes_p = copy.deepcopy(holes_p)
+            holes_p = lambda d, p = prev_holes_p: Not(p(d))
+
+            prev_final_holes_p = copy.deepcopy(final_holes_p)
+            final_holes_p = lambda d, p = prev_final_holes_p, q = holes_p: And(p(d), q(d))
+
+            final_P = lambda d, p = P, q = inputs_p, h = final_holes_p: And(And(q(d), h(d)), p(d))
+
+            result, solver = self.find_holes(ast_holes, final_P, Q, linv=linv)
+            if result == False:
+                print("The program is not verified")
+                return ""
+            
+            new_holes_dict = self.extract_holes_from_dict(extract_model_assignments(solver))
+            print("new holes dict:", new_holes_dict)
+
+            if new_holes_dict == {}:
+                print("No new holes found")
+                return ""
+            
+            filled_program = self.fill_holes_dict(holes_program, new_holes_dict)
+            filled_program, _ = self.fill_holes_with_zeros(filled_program, holes)
+            print("new filled program:")
+            print(filled_program)
+
+            
+
+
+
+# def find_holes(ast, P, Q, linv):
+#     if ast is not None:
+#         wp = WP(ast)
+#         wp_stmt = wp.wp(ast, Q, linv)
+#         VC = Implies(P(wp.env), wp_stmt(wp.env))
+
+#         solver = Solver()
+#         solver.add(VC)
+
+#         if solver.check() == unsat:
+#             print(">> The program is NOT verified.")
+#         else:
+#             print(">> The program is verified.")
+#             print("holes examples: ", solver.model())
+
+# def find_holes2(ast, P, Q, linv):
+#     wp = WP(ast)
+#     wp_stmt = wp.wp(ast, Q, linv)
+
+#     VC = And(P(wp.env), wp_stmt(wp.env))
+    
+#     solver = Solver()
+#     solver.add(VC)
+
+#     if solver.check() == unsat:
+#         print(">> The program is Not verified.")
+#         return False, None
+#     else:
+#         print(">> The program is verified.")
+#         print("holes:", str(solver.model()) )
+#         return True, solver
 
 def test_assertions():
 ## start of counter example synthesis
@@ -333,27 +463,66 @@ def test_assertions():
     Q = lambda d: d["a"] == d["c"]
     linv = lambda d: True
 
-    synth = Synthesizer(orig_program, pvars)
+    # synth = Synthesizer(orig_program)
+
+    # orig_program = "c1 := 0 ; c2 := 1 ; a := c1 * x ; b := c2 - 1 ; a := a + b; c := x + x "
+    # orig_program = "c1 := hole_1 ; c2 := hole_2 ; a := c1 * x ; b := c2 - 1 ; a := a + b; c := x + x "
+    # orig_program = "c1 := 3 ; c2 := 0 ; a := c1 * x ; b := c2 - 1 ; a := a + b; c := x + x "
+    # orig_program = "c1 := hole_1 ; c2 := hole_2 ; a := c1 * x ; b := c2 - 1 ; a := a + b; c := x + x "
+    # orig_program = "c1 := 0 ; c2 := 5 ; a := c1 * x ; b := c2 - 1 ; a := a + b; c := x + x "
+    # orig_program = "c1 := hole_1 ; c2 := hole_2 ; a := c1 * x ; b := c2 - 1 ; a := a + b; c := x + x "
+
+    # P = lambda d: True
+    # P = lambda d: And(d["x"] == 1, Not(And(d["hole_1"] == 0, d["hole_2"] == 0))) # for verification
+    # P = lambda d: True
+    # P = lambda d: And(d["x"] == 2, And(
+    #                                     Not(And(d["hole_1"] == 3, d["hole_2"] == 0)),
+    #                                     Not(And(d["hole_1"] == 0, d["hole_2"] == 0))
+    #                                   )
+    #                  )
+    # P = lambda d: True
+    # P = lambda d: And(d["x"] == 3, And(
+    #                                     Not(And(d["hole_1"] == 3, d["hole_2"] == 0)),
+    #                                     Not(And(d["hole_1"] == 0, d["hole_2"] == 0)),
+    #                                     Not(And(d["hole_1"] == 0, d["hole_2"] == 5))
+    #                                   )
+    #                  )
+
+    # Q = lambda d: d["a"] == d["c"]
+    # linv = lambda d: True
+
+    # ast = parse(orig_program)
+    # result = verify(P, ast, Q, linv=linv)
+    # result = find_holes2(ast, P, Q, linv=linv)
+
+
+    orig_program = "c1 := ?? ; c2 := ?? ; a := c1 * x ; b := c2 - 1 ; a := a + b; c := x + x "
+
+    synth = Synthesizer(orig_program)
+    synth.synth_program(orig_program, P, Q, linv)
+
 
 ## end of counter example synthesis
 
 def main():
 
-    program = "b := 3 ; c := 6 ; d := b + c ; assert (a = d)"
+    test_assertions()
 
-    P = lambda d: d["a"] == 9
-    Q = lambda d: True
-    linv = lambda d: True
+    # program = "b := 3 ; c := 6 ; d := b + c ; assert (a = d)"
 
-    ast = parse(program)
-    print(ast)
+    # P = lambda d: d["a"] == 9
+    # Q = lambda d: True
+    # linv = lambda d: True
 
-    if ast is not None:
-        print(">> Valid program.")
-        # Your task is to implement "verify"
-        verify(P, ast, Q, linv=linv)
-    else:
-        print(">> Invalid program.")
+    # ast = parse(program)
+    # print(ast)
+
+    # if ast is not None:
+    #     print(">> Valid program.")
+    #     # Your task is to implement "verify"
+    #     verify(P, ast, Q, linv=linv)
+    # else:
+    #     print(">> Invalid program.")
 
 
 if __name__ == "__main__":
