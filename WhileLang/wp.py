@@ -59,8 +59,8 @@ class WP:
 
         #print(ast)
         env, vars = mk_env_from_ast(ast)
-        print("env, vars:")
-        print(env, vars)
+        # print("env, vars:")
+        # print(env, vars)
 
         self.env = env
         self.vars = vars
@@ -123,7 +123,7 @@ class WP:
 
 
 
-def verify(P: Invariant, ast: Tree, Q: Invariant, linv: Invariant) -> bool:
+def verify(P: Invariant, ast: Tree, Q: Invariant, linv: Invariant):
     """Verify a Hoare triple {P} c {Q}
     Where P, Q are assertions (see below for examples)
     and ast is the AST of the command c.
@@ -147,6 +147,32 @@ def verify(P: Invariant, ast: Tree, Q: Invariant, linv: Invariant) -> bool:
         print(">> The program is NOT verified.")
         print("Counterexample:", str(solver.model()) )
         return False, solver
+    
+def verify2(P: Invariant, ast: Tree, Q: Invariant, linv: Invariant):
+    """Verify a Hoare triple {P} c {Q}
+    Where P, Q are assertions (see below for examples)
+    and ast is the AST of the command c.
+    Returns `True` iff the triple is valid.
+    Also prints the counterexample (model) returned from Z3 in case
+    it is not.
+    """
+
+    wp = WP(ast)
+    wp_stmt = wp.wp(ast, Q, linv)
+
+    # VC = Implies(P(wp.env), wp_stmt(wp.env))
+    VC = And(P(wp.env), wp_stmt(wp.env))
+    
+    solver = Solver()
+    solver.add(VC)
+
+    if solver.check() == sat:
+        print(">> The program has satisfying inputs.")
+        print("Satisfying input:", solver.model())
+        return True, solver
+    else:
+        print(">> No satisfying input found.")
+        return False, None
 
 def extract_model_assignments(solver):
     model = solver.model()

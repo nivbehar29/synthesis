@@ -136,7 +136,7 @@ class Synthesizer:
     
     def fill_holes_with_zeros(self, program, holes: list):
         """Fills the holes in the program with a '0'"""
-        print("hole to fill with zeroes: ", holes)
+        # print("hole to fill with zeroes: ", holes)
     
         holes_dict = {}
         for hole in holes:
@@ -305,19 +305,27 @@ class Synthesizer:
         solver.add(VC)
 
         if solver.check() == unsat:
-            print(">> The program is Not verified.")
             return False, None
         else:
-            print(">> The program is verified.")
-            print("holes:", str(solver.model()) )
             return True, solver
 
-    def synth_program(self, orig_program, P, Q, linv = None):
+    class ProgramNotValid(Exception):
+        """Raised when a specific program is not valid."""
+        pass
+
+    class ProgramNotVerified(Exception):
+        """Raised when a specific program can't be verified."""
+        pass
+
+    class NoInputToSatisfyProgram(Exception):
+        """Raised when a specific program can't be verified."""
+        pass
+
+    def synth_program(self, orig_program, P, Q, linv = None, lower_bound = -100, upper_bound = 100):
         ast_orig = parse(orig_program)
 
         if(self.ast_orig is None):
-            print("Error: Invalid program")
-            return ""
+            raise self.ProgramNotValid("The given program can't be parsed")
 
         pvars = sorted(list(getPvars(ast_orig)))
         print("Pvars: ", pvars)
@@ -332,15 +340,38 @@ class Synthesizer:
             Q = lambda d: True
 
         holes_program, holes = self.process_holes(orig_program) # Replace all occurrences of '??' with unique hole variables, returnes program with holes vars, and holes vars list
+
+        if(holes == []):
+            print("No holes found in the program. trying to verify the program")
+            is_verified, _ = verify(P, ast_orig, Q, linv=linv)
+            if(is_verified == False):
+                raise self.ProgramNotVerified("The given program is not verified for all inputs")
+            return orig_program
+
         ast_holes = parse(holes_program)
         if(ast_holes is None):
-            print("Error: Invalid program")
-            return ""
+            raise self.ProgramNotValid("The given program can't be parsed")
+        
+        is_there_valid_input, _ = verify2(P, ast_holes, Q, linv=linv)
+        if(is_there_valid_input == False):
+            raise self.NoInputToSatisfyProgram("The given program has no input which can satisfy the conditions")
+        
 
         filled_program, filled_holes_dict = self.fill_holes_with_zeros(holes_program, holes)
-        final_holes_p = lambda d: True
+        
+
+        # this is to bound the limits of the holes - maybe we will need this for complicated programs
+        bound_conditions = lambda d: True
+        if(lower_bound != None and upper_bound != None):
+            for i in range(len(holes)):
+                prev_bound_conditions = copy.deepcopy(bound_conditions)
+                print("hole key:", holes[i], "bound:", lower_bound, upper_bound)
+                bound_conditions = lambda d, hole_key=holes[i], q=prev_bound_conditions: And(q(d), d[hole_key] <= upper_bound, d[hole_key] >= lower_bound)
+           
+        final_holes_p = copy.deepcopy(bound_conditions)
 
         while(True):
+            print("\n*******************************************\n")
             ast_filled = parse(filled_program)
             result, solver = verify(P, ast_filled, Q, linv=linv)
             if result == True:
@@ -354,28 +385,44 @@ class Synthesizer:
 
             print("counter example dict:", ce)
 
-            inputs_p = lambda d: True
+            # This is dumb - Z3 has a bug when it gives a counter example with inputs which are not equal to inputs we assign in P
+            # Or am I dumb? - I need to check this
+            # For the time being, I will assign the inputs manually to the beginning of the program
+            # inputs_p = lambda d: True
+            # for input_key in ce:
+            #     print("add input key:", input_key, "=", ce[input_key])
+            #     input_p = lambda d: d[input_key] == ce[input_key]
+            #     prev_inputs_p = copy.deepcopy(inputs_p)
+            #     inputs_p = lambda d, p = prev_inputs_p, q = input_p: And(p(d), q(d))
+
+            inputs_code = ""
             for input_key in ce:
-                input_p = lambda d: And(d[input_key] == ce[input_key])
-                prev_inputs_p = copy.deepcopy(inputs_p)
-                inputs_p = lambda d, p = prev_inputs_p, q = input_p: And(p(d), q(d))
+                print("add input key:", input_key, ":=", ce[input_key])
+                inputs_code += f"{input_key} := {ce[input_key]} ; "
+
+            holes_program_with_inputs = inputs_code + holes_program
+            ast_holes_inputs = parse(holes_program_with_inputs)
 
             holes_p = lambda d: True
             for hole_key in filled_holes_dict:
-                hole_p = lambda d: And(d[hole_key] == filled_holes_dict[hole_key])
-                holes_p = lambda d, p = holes_p, q = hole_p: And(p(d), q(d))
-            prev_holes_p = copy.deepcopy(holes_p)
-            holes_p = lambda d, p = prev_holes_p: Not(p(d))
+                print("excluded hole key:", hole_key, "!=", filled_holes_dict[hole_key])
+                hole_p = lambda d: d[hole_key] != filled_holes_dict[hole_key]
+                prev_holes_p = copy.deepcopy(holes_p)
+                holes_p = lambda d, p = prev_holes_p, q = hole_p: And(p(d), q(d))
 
             prev_final_holes_p = copy.deepcopy(final_holes_p)
             final_holes_p = lambda d, p = prev_final_holes_p, q = holes_p: And(p(d), q(d))
 
-            final_P = lambda d, p = P, q = inputs_p, h = final_holes_p: And(And(q(d), h(d)), p(d))
+            # final_P = lambda d, p = P, q = inputs_p, h = final_holes_p: And(p(d), h(d), q(d))
+            final_P = lambda d, p = P, h = final_holes_p: And(p(d), h(d))
 
-            result, solver = self.find_holes(ast_holes, final_P, Q, linv=linv)
+            print("Finding holes")
+            # result, solver = self.find_holes(ast_holes, final_P, Q, linv=linv)
+            result, solver = self.find_holes(ast_holes_inputs, final_P, Q, linv=linv)
             if result == False:
-                print("The program is not verified")
-                return ""
+                raise self.ProgramNotVerified("The given program is not verified for all inputs")
+            else:
+                print("holes:", solver.model())
             
             new_holes_dict = self.extract_holes_from_dict(extract_model_assignments(solver))
             print("new holes dict:", new_holes_dict)
@@ -385,7 +432,14 @@ class Synthesizer:
                 return ""
             
             filled_program = self.fill_holes_dict(holes_program, new_holes_dict)
-            filled_program, _ = self.fill_holes_with_zeros(filled_program, holes)
+            holes_to_fill_with_zeroes = [key for key in holes if key not in new_holes_dict.keys()]
+            print("holes to fill with zeroes:", holes_to_fill_with_zeroes)
+            filled_program, holes_filled_with_zeroes_dict = self.fill_holes_with_zeros(filled_program, holes_to_fill_with_zeroes)
+            print("new_holes_dict:", new_holes_dict)
+            print("holes_filled_with_zeroes_dict:", holes_filled_with_zeroes_dict)
+            filled_holes_dict = new_holes_dict
+            filled_holes_dict.update(holes_filled_with_zeroes_dict)
+            print("filled_holes_dict:", filled_holes_dict)
             print("new filled program:")
             print(filled_program)
 
@@ -496,10 +550,23 @@ def test_assertions():
     # result = find_holes2(ast, P, Q, linv=linv)
 
 
-    orig_program = "c1 := ?? ; c2 := ?? ; a := c1 * x ; b := c2 - 1 ; a := a + b; c := x + x "
+    orig_program = "c1 := ?? ; assert(c1 >= 2) ; c2 := ?? ; a := c1 * x ; b := c2 - 1 ; a := a + b; c := x + x ; assert(a = c)"
+    # orig_program = "c1 := ?? ; assert(c1 >= 3) ; c2 := ?? ; a := c1 * x ; b := c2 - 1 ; a := a + b; c := x + x ; assert(a = c)"
+    # orig_program = "assert(c1 >= 3) ; a := c1 * x ; b := c2 - 1 ; a := a + b; c := x + x ; assert(a = c)"
+    P = lambda d: True
+    Q = lambda d: True
+    linv = lambda d: True
 
     synth = Synthesizer(orig_program)
-    synth.synth_program(orig_program, P, Q, linv)
+    try:
+        program = synth.synth_program(orig_program, P, Q, linv)
+        print(program)
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")
+    else:
+        print("GGGGGGGGGGGGGG")
+
+    
 
 
 ## end of counter example synthesis
