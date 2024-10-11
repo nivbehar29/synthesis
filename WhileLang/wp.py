@@ -142,6 +142,7 @@ def verify(P: Invariant, ast: Tree, Q: Invariant, linv: Invariant):
 
     if solver.check() == unsat:
         print(">> The program is verified.")
+        del solver
         return True, None
     else:
         print(">> The program is NOT verified.")
@@ -174,6 +175,7 @@ def is_exist_input_to_satisfy(P: Invariant, ast: Tree, Q: Invariant, linv: Invar
         return True, solver
     else:
         print(">> No satisfying input found.")
+        del solver
         return False, None
 
 def extract_model_assignments(solver):

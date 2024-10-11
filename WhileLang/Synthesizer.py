@@ -310,6 +310,7 @@ class Synthesizer:
         solver.add(VC)
 
         if solver.check() == unsat:
+            del solver
             return False, None
         else:
             return True, solver
@@ -430,6 +431,8 @@ class Synthesizer:
 
             print("counter example dict:", ce)
 
+            del solver
+
             # This is dumb - Z3 has a bug when it gives a counter example with inputs which are not equal to inputs we assign in P
             # Or am I dumb? - I need to check this
             # For the time being, I will assign the inputs manually to the beginning of the program
@@ -475,6 +478,8 @@ class Synthesizer:
             if new_holes_dict == {}:
                 print("No new holes found")
                 return ""
+            
+            del solver
             
             filled_program = self.fill_holes_dict(program_holes_unrolled, new_holes_dict)
             holes_to_fill_with_zeroes = [key for key in holes if key not in new_holes_dict.keys()]
