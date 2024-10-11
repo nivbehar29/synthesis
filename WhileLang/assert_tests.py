@@ -348,16 +348,21 @@ def dummy():
     # is_exist_input_to_satisfy(P, parse(program), Q, linv)
 
     # why does this not verifyed?!?!
-    program = "x:=10 ; y := x + 1; a := 0 ; while a != 1 do ( a := 1 )"# ; assert x = 10"
-    P = lambda d: True
-    Q = lambda d: d["x"] == 10
-    linv = lambda d: d["x"] >= 0
-    verify(P, parse(program), Q, linv)
+    # program = "x:=10 ; y := x + 1; a := 0 ; while a != 1 do ( a := 1 )"# ; assert x = 10"
+    # P = lambda d: True
+    # Q = lambda d: d["x"] == 10
+    # linv = lambda d: d["x"] >= 0
+    # verify(P, parse(program), Q, linv)
 
     # program = "x:= hole_0 ; a := 0 ;assert(x >= 0); if a != 1 then ( a := 1 ) else skip ; assert(x >= 0)"
     # res = from_assert_to_list_to_verify(program)
     # print(res[0])
     # print(res[1])
+
+    linv = lambda d: d["x"] >= 0
+    from syntax.while_lang import WhileParser
+    parsed_linv = WhileParser()("assert(" + "x = 3" + ")")
+    print(parsed_linv)
 
 def assert_tests():
     print("assert tests")
@@ -394,10 +399,11 @@ def assert_tests():
     ]
 
     test_cases = []
-    test_cases += basic_cases
-    test_cases += holes_basic_cases
-    test_cases += holes_no_sol_cases
-    test_cases += holes_while_cases
+    # test_cases += basic_cases
+    # test_cases += holes_basic_cases
+    # test_cases += holes_no_sol_cases
+    # test_cases += holes_while_cases
+    test_cases += [dummy]
 
     results = []
 

@@ -100,12 +100,10 @@ def run_synthesis(program_text, queue, loop_unrolling_limit):
 
         print("Synthesis successful.")
         queue.put(returned_program)
-    except Synthesizer.ProgramNotValid:
-        queue.put("Program not valid")
-    except Synthesizer.ProgramNotVerified:
-        queue.put("Program not verified")
+    except (Synthesizer.ProgramNotValid, Synthesizer.ProgramNotVerified) as e:
+        queue.put(e)
     except Exception as e:
-        queue.put(f"An unexpected error occurred: {e}")
+        queue.put(e)
 
 # Function to handle the button press
 def process_assertion_program_input():
@@ -164,9 +162,20 @@ def process_assertion_program_input():
             if not queue.empty():
 
                 # Get the result from the queue
-                result = queue.get()
-                print("synthesis result:", result)
-                output_text.insert("1.0", result)  # Display the synthesized program
+                synth_result = queue.get()
+                final_output = ""
+                # output_text.insert("1.0", f"Error: {str(result)}")
+                if isinstance(synth_result, Synthesizer.ProgramNotValid):
+                    final_output = "Error: Program not valid"
+                elif isinstance(synth_result, Synthesizer.ProgramNotVerified):
+                    final_output = "Error: Program not verified."
+                elif isinstance(synth_result, Exception):
+                    final_output = f"An unexpected error occurred: {synth_result}"
+                else:
+                    print("synthesis result:", synth_result)
+                    final_output = synth_result
+
+                output_text.insert("1.0", final_output)  # Display the synthesized program
 
 
     check_process()
@@ -204,15 +213,12 @@ loop_unrolling_entry = tk.Entry(assertion_frame, font=("Helvetica", 12))
 loop_unrolling_entry.insert(0, "10")  # Set default value
 loop_unrolling_entry.pack(pady=5)
 
-# Initialize a flag for synthesis cancellation
-synthesis_cancelled = False
-
 # Function to create buttons below the output window
 def create_buttons(parent):
-    add_condition_button = tk.Button(parent, text="Add Condition (P, Q, Linv)", state='disabled')
+    add_condition_button = tk.Button(assertion_frame, text="Add Condition (P, Q, Linv)", state='disabled')
     add_condition_button.pack(pady=5)
 
-    verify_program_button = tk.Button(parent, text="Verify Program", state='disabled')
+    verify_program_button = tk.Button(assertion_frame, text="Verify Program", state='disabled')
     verify_program_button.pack(pady=5)
 
     return add_condition_button, verify_program_button
