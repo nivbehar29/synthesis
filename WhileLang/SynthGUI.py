@@ -1,16 +1,15 @@
 from Synthesizer import Synthesizer
 import os
 from contextlib import redirect_stdout
-import threading
 import multiprocessing
 import tkinter as tk
-from tkinter import ttk, messagebox
-import time
+from tkinter import ttk, messagebox, Toplevel
+from z3 import ForAll, Implies, Not, And, Or
 
 # Initialize the main window
 root = tk.Tk()
 root.title("While Language Synthesis")
-root.geometry("800x800")  # Increased height to accommodate both input and output areas
+root.geometry("800x900")  # Increased height to accommodate both input and output areas
 
 # Create a Notebook for tabs
 notebook = ttk.Notebook(root)
@@ -64,6 +63,14 @@ output_text.config(state='normal')  # Temporarily make the output editable
 output_text.insert('1.0', "Output program")  # Add initial text
 output_text.config(state='disabled')  # Make the output non-editable again
 
+# Add a section for error messages below the output_text
+message_label = tk.Label(root, text="Messages:", font=("Helvetica", 12, "bold"))
+message_label.pack(pady=10)
+
+message_text = tk.Text(root, height=5, width=60, wrap='word', bg='lightgray')
+message_text.pack(padx=20, pady=(0, 10))
+message_text.config(state='disabled')  # Make the output non-editable again
+
 # ------------------------------
 # PBE Tab Layout
 # ------------------------------
@@ -82,7 +89,126 @@ pbe_info.pack(pady=5)
 # Assertion-based Tab Layout
 # ------------------------------
 
-def synth_program(program, P, Q, linv, expected_program, debug=False, unroll_limit=10):
+class CEGIS_Tab:
+    def __init__(self):
+        self.P = lambda d: True
+        self.Q = lambda d: True
+        self.linv = lambda d: True
+
+        self.P_str = "True"
+        self.Q_str = "True"
+        self.linv_str = "True"
+
+cegis = CEGIS_Tab()
+
+
+
+# Create a button to confirm a condition
+def reset_condition(cond_type : str, input_window):
+    message_text.config(state='normal')  # Make output editable
+    message_text.delete('1.0', tk.END)  # Clear previous output
+    message_text.insert("1.0", f"{cond_type}: \"True\" has been set successfully.\n")
+    message_text.config(state='disabled')  # Make the output non-editable again
+
+    input_window.delete('1.0', tk.END)  # Clear previous condition
+    input_window.insert("1.0", "True")  # Set new condition
+
+    cegis.linv = lambda d: True
+    cegis.linv_str = "True"
+
+# Create a button to confirm a condition
+def set_condition(cond_text, cond_type : str):
+    cond = None
+    # cond_text = input.get("1.0", tk.END).strip()
+
+    # Try to evaluate the loop invariant using eval() in a safe environment
+    safe_env = {
+        'And': And, 'Or': Or, 'Implies': Implies, 'Not': Not, 'ForAll': ForAll
+    }
+
+
+    message_text.config(state='normal')  # Make output editable
+    message_text.delete('1.0', tk.END)  # Clear previous output
+
+    try:
+        cond = eval("lambda d: " + cond_text, safe_env)  # Evaluate in Z3 context
+        message_text.insert("1.0", f"{cond_type}: \"{cond_text}\" has been set successfully.\n")
+    except Exception as e:
+        message_text.insert("1.0", f"Error: Invalid {cond_type}: {e}\n")
+        
+    message_text.config(state='disabled')  # Make the output non-editable again
+
+    if(cond != None):
+        cegis.linv = cond
+        cegis.linv_str = cond_text
+
+def open_conditions_window():
+    # Create a new window
+    conditions_window = Toplevel(root)
+    conditions_window.title("Add Loop Invariant")
+    conditions_window.geometry("600x400")
+    conditions_window.grab_set()
+
+
+    # --- Loop-Invariant Section ---
+
+    # Create a label for the invariant input
+    label_linv = tk.Label(conditions_window, text="Loop-Invariant:")
+    label_linv.place(x=5, y=30)  # Set the position of the label (x, y)
+
+    # Create a text input for the loop invariant
+    invariant_input = tk.Text(conditions_window, height=5, width=40)
+    invariant_input.place(x=120, y=10)  # Set the position of the text input (x, y)
+    invariant_input.insert('1.0', cegis.linv_str)  # Add initial text
+
+    # Create a button to set the loop-invariant
+    set_linv_button = tk.Button(conditions_window, text="Set Loop Invariant", command=lambda: set_condition(invariant_input.get("1.0", tk.END).strip(), "Loop-Invariant"))
+    set_linv_button.place(x = 450, y=30)  # Set the position of the button (x, y)
+
+    # Create a button to reset the loop-invariant
+    reset_linv_button = tk.Button(conditions_window, text="Reset Loop Invariant", command=lambda: reset_condition("Loop-Invariant", invariant_input))
+    reset_linv_button.place(x = 450, y=60)  # Set the position of the button (x, y)
+
+    # --- Pre-Condition Section ---
+
+    # Create a label for the pre-condition input
+    label_pre = tk.Label(conditions_window, text="Pre-Condition:")
+    label_pre.place(x=5, y=150)  # Set the position of the label (x, y)
+
+    # Create a text input for the pre-condition
+    precondition_input = tk.Text(conditions_window, height=5, width=40)
+    precondition_input.place(x=120, y=130)  # Set the position of the text input (x, y)
+    precondition_input.insert('1.0', cegis.P_str)  # Add initial text (if applicable)
+
+    # Create a button to set the pre-condition
+    set_pre_button = tk.Button(conditions_window, text="Set Pre-Condition", command=lambda: set_condition(precondition_input.get("1.0", tk.END).strip(), "Pre-Condition"))
+    set_pre_button.place(x=450, y=150)  # Set the position of the button (x, y)
+
+    # Create a button to reset the pre-condition
+    reset_pre_button = tk.Button(conditions_window, text="Reset Pre-Condition", command=lambda: reset_condition("Pre-Condition", precondition_input))
+    reset_pre_button.place(x = 450, y=180)  # Set the position of the button (x, y)
+
+    # --- Post-Condition Section ---
+
+    # Create a label for the post-condition input
+    label_post = tk.Label(conditions_window, text="Post-Condition:")
+    label_post.place(x=5, y=270)  # Set the position of the label (x, y)
+
+    # Create a text input for the post-condition
+    post_condition_input = tk.Text(conditions_window, height=5, width=40)
+    post_condition_input.place(x=120, y=250)  # Set the position of the text input (x, y)
+    post_condition_input.insert('1.0', cegis.Q_str)
+
+    # Create a button to set the post-condition
+    set_post_button = tk.Button(conditions_window, text="Set Post-Condition", command=lambda: set_condition(post_condition_input.get("1.0", tk.END).strip(), "Post-Condition"))
+    set_post_button.place(x=450 + 5, y=270)  # Set the position of the button (x, y)
+
+    # Create a button to reset the post-condition
+    reset_post_button = tk.Button(conditions_window, text="Reset Post-Condition", command=lambda: reset_condition("Post-Condition", post_condition_input))
+    reset_post_button.place(x = 450, y=300)  # Set the position of the button (x, y)
+
+
+def synth_program(program, P, Q, linv, debug=False, unroll_limit=10):
     returned_program = ""
     synth = Synthesizer(program)
     if not debug:
@@ -96,7 +222,7 @@ def synth_program(program, P, Q, linv, expected_program, debug=False, unroll_lim
 
 def run_synthesis(program_text, queue, loop_unrolling_limit):
     try:
-        returned_program = synth_program(program_text, None, None, None, None, False, loop_unrolling_limit)
+        returned_program = synth_program(program_text, None, None, None, False, loop_unrolling_limit)
 
         print("Synthesis successful.")
         queue.put(returned_program)
@@ -110,14 +236,14 @@ def process_assertion_program_input():
 
     global process
 
-    output_text.config(state='normal')  # Make output editable
-    output_text.delete('1.0', tk.END)  # Clear previous output
+    message_text.config(state='normal')  # Make output editable
+    message_text.delete('1.0', tk.END)  # Clear previous output
   
     try:
         loop_unrolling_limit = int(loop_unrolling_entry.get())  # Try to convert to integer
     except Exception:
-        output_text.insert("1.0", "Error: Loop unrolling limit must be an integer.")  # Display error message
-        output_text.config(state='disabled')  # Make it non-editable again
+        message_text.insert("1.0", "Error: Loop unrolling limit must be an integer.")  # Display error message
+        message_text.config(state='disabled')  # Make it non-editable again
         return 
 
     program_text = program_input.get("1.0", tk.END).strip()  # Get text from input area
@@ -125,8 +251,8 @@ def process_assertion_program_input():
 
     # Check if the loop unrolling limit is less than 0
     if loop_unrolling_limit < 0:
-        output_text.insert("1.0", "Error: Loop unrolling limit must be greater than or equal to 0.")  # Display error message
-        output_text.config(state='disabled')  # Make it non-editable again
+        message_text.insert("1.0", "Error: Loop unrolling limit must be greater than or equal to 0.")  # Display error message
+        message_text.config(state='disabled')  # Make it non-editable again
         return
 
     # Show the "Please Wait" window
@@ -164,18 +290,28 @@ def process_assertion_program_input():
                 # Get the result from the queue
                 synth_result = queue.get()
                 final_output = ""
+                error = ""
                 # output_text.insert("1.0", f"Error: {str(result)}")
                 if isinstance(synth_result, Synthesizer.ProgramNotValid):
-                    final_output = "Error: Program not valid"
+                    error = "Error: Program not valid"
                 elif isinstance(synth_result, Synthesizer.ProgramNotVerified):
-                    final_output = "Error: Program not verified."
+                    error = "Error: Program not verified."
                 elif isinstance(synth_result, Exception):
-                    final_output = f"An unexpected error occurred: {synth_result}"
+                    error = f"An unexpected error occurred: {synth_result}"
                 else:
                     print("synthesis result:", synth_result)
                     final_output = synth_result
 
-                output_text.insert("1.0", final_output)  # Display the synthesized program
+                if(error != ""):
+                    message_text.config(state='normal')  # Make output editable
+                    message_text.delete('1.0', tk.END)  # Clear previous output
+                    message_text.insert("1.0", error)  # Display the synthesized program
+                    message_text.config(state='disabled')  # Make the output non-editable again
+                else:
+                    output_text.config(state='normal')  # Make output editable
+                    output_text.delete('1.0', tk.END)  # Clear previous output
+                    output_text.insert("1.0", final_output)  # Display the synthesized program
+                    output_text.config(state='disabled')  # Make the output non-editable again
 
 
     check_process()
@@ -215,7 +351,7 @@ loop_unrolling_entry.pack(pady=5)
 
 # Function to create buttons below the output window
 def create_buttons(parent):
-    add_condition_button = tk.Button(assertion_frame, text="Add Condition (P, Q, Linv)", state='disabled')
+    add_condition_button = tk.Button(assertion_frame, text="Set Conditions (P, Q, Linv)", command=open_conditions_window)
     add_condition_button.pack(pady=5)
 
     verify_program_button = tk.Button(assertion_frame, text="Verify Program", state='disabled')
@@ -228,4 +364,19 @@ add_condition_button, verify_program_button = create_buttons(root)
 
 # Start the main GUI loop
 if __name__ == "__main__":
+
     root.mainloop()
+    
+    # safe_env = {
+    #     'And': And, 'Or': Or, 'Implies': Implies, 'Not': Not, 'ForAll': ForAll
+    # }
+
+    # linv_str = "And(d['a'] == d['b'], d['a'] > 0)"
+    # print(linv_str)
+
+    # try:
+    #     linv = eval("lambda d:" + linv_str, safe_env)  # Evaluate in the context of Z3 functions
+    #     env = {'a': 2, 'b': 1}
+    #     print(linv(env))
+    # except Exception as e:
+    #     print(f"Error: Invalid loop invariant. {e}")
