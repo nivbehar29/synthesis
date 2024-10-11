@@ -10,7 +10,7 @@ __all__ = ["parse"]
 class WhileParser:
 
     TOKENS = (
-        r"(if|then|else|while|do|skip|assert)(?![\w\d_]) "
+        r"(if|if_unrolled|then|else|while|do|skip|assert)(?![\w\d_]) "
         r"(?P<id>[^\W\d]\w*) "
         r"(?P<num>[+\-]?\d+) "
         r"(?P<op>[!<>]=|([+\-*/<>=])) "
@@ -19,7 +19,7 @@ class WhileParser:
     )
     GRAMMAR = r"""
     S   ->   S1     |   S1 ; S
-    S1  ->   skip   |   id := E   |   if E then S else S1   |   while E do S1  |   assert E
+    S1  ->   skip   |   id := E   |   if E then S else S1   |   if_unrolled E then S else S1    |   while E do S1  |   assert E
     S1  ->   ( S )
     E   ->   E0   |   E0 op E0
     E0  ->   id   |   num   |   hole
@@ -57,7 +57,7 @@ class WhileParser:
             )
         elif len(t.subtrees) == 3 and t.subtrees[0].root == "(":
             return self.postprocess(t.subtrees[1])
-        elif t.root == "S1" and t.subtrees[0].root in ["if", "while", 'assert']:
+        elif t.root == "S1" and t.subtrees[0].root in ["if", "if_unrolled", "while", 'assert']:
             return self.postprocess(Tree(t.subtrees[0].root, t.subtrees[1::2]))
         elif t.root == "num":
             return Tree(t.root, [Tree(int(t.subtrees[0].root))])  # parse ints
@@ -87,11 +87,11 @@ def unroll_while(tree: Tree, unroll_bound: int) -> Tree:
         body = tree.subtrees[1]
         
         # Start with the first `if cond then body else skip`
-        unrolled = Tree("if", [cond, body, Tree("skip", [])])  # First unrolled iteration
+        unrolled = Tree("if_unrolled", [cond, body, Tree("skip", [])])  # First unrolled iteration
         
         # Create a sequence of `if cond then body else skip` statements
         for _ in range(unroll_bound - 1):
-            next_unroll = Tree("if", [cond, body, Tree("skip", [])])
+            next_unroll = Tree("if_unrolled", [cond, body, Tree("skip", [])])
             unrolled = Tree(";", [unrolled, next_unroll])  # Sequence them with `;`
         
         return unrolled
@@ -113,7 +113,9 @@ def parse_and_unroll(program: str, unroll_limit: int = 8) -> Tree:
     """
     ast = parse(program)
     if ast:
-        return unroll_while(ast, unroll_limit)
+        res = unroll_while(ast, unroll_limit)
+        print(res)
+        return res
     else:
         return None
 
@@ -132,11 +134,11 @@ def tree_to_program(tree: Tree) -> str:
         right = tree_to_program(tree.subtrees[1])
         return f"{left} := {right}"
     
-    elif tree.root == "if":  # If-then-else statement
+    elif tree.root == "if" or tree.root == "if_unrolled":  # If-then-else statement
         cond = tree_to_program(tree.subtrees[0])
         then_part = tree_to_program(tree.subtrees[1])
         else_part = tree_to_program(tree.subtrees[2])
-        return f"if {cond} then {then_part} else {else_part}"
+        return f"{tree.root} {cond} then {then_part} else {else_part}"
     
     elif tree.root == "while":  # While loop
         cond = tree_to_program(tree.subtrees[0])

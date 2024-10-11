@@ -399,11 +399,11 @@ def assert_tests():
     ]
 
     test_cases = []
-    # test_cases += basic_cases
-    # test_cases += holes_basic_cases
-    # test_cases += holes_no_sol_cases
-    # test_cases += holes_while_cases
-    test_cases += [dummy]
+    test_cases += basic_cases
+    test_cases += holes_basic_cases
+    test_cases += holes_no_sol_cases
+    test_cases += holes_while_cases
+    # test_cases += [dummy]
 
     results = []
 

@@ -105,6 +105,19 @@ class WP:
                 And(self.eval_expr(cond, env), self.wp(then_branch, Q, linv)(env)),
                 And(Not(self.eval_expr(cond, env)), self.wp(else_branch, Q, linv)(env))
             )
+        elif node_type == "if_unrolled":
+            cond = subtrees[0]
+            then_branch = subtrees[1]
+            else_branch = subtrees[2]
+            program_vars = [*self.env.values()]
+
+            return lambda env: And(
+                linv(env),
+                Or(
+                    And(self.eval_expr(cond, env), self.wp(then_branch, Q, linv)(env)),
+                    And(Not(self.eval_expr(cond, env)), self.wp(else_branch, Q, linv)(env))
+                )
+            )
         elif node_type == "while":
             cond = subtrees[0]
             body = subtrees[1]
