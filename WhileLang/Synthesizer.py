@@ -90,10 +90,12 @@ class Synthesizer:
     def generate_conditions(self, inputs, outputs, pvars):
         P = []
         Q = []
+        inputs_example_tuples = []
 
         for example_input, example_output in zip(inputs, outputs):
             p = lambda d: True
             q = lambda d: True
+            inputs_tuples = []
 
             print("\nadding conditions to P:")
             for var, value in zip(pvars, example_input):
@@ -101,6 +103,7 @@ class Synthesizer:
                     prev_p = copy.deepcopy(p)
                     p = lambda d, p = prev_p, var = var, value = value: And(p(d), d[var] == value)
                     print(f"var = {var}, value = {value}")
+                    inputs_tuples.append((var, value))
                     
 
             print("\nadding conditions to Q:")
@@ -110,12 +113,14 @@ class Synthesizer:
                     q = lambda d, q = prev_q, var = var, value = value: And(q(d), d[var] == value)
                     print(f"var = {var}, value = {value}")
 
+            inputs_example_tuples.append(inputs_tuples)
+
             print("\n")
 
             P.append(p)
             Q.append(q)
 
-        return P, Q
+        return P, Q, inputs_example_tuples
 
     def fill_holes(self, program, sol):
         """Fills the holes in the program with the values from the solver model."""
@@ -161,6 +166,71 @@ class Synthesizer:
         # Create a new dictionary excluding keys that match the pattern
         non_holes_dict = {k: v for k, v in dict.items() if not hole_pattern.match(k)}
         return non_holes_dict
+
+    def synth_IO_program_new(self, orig_program, inputs, outputs, lower_bound = -100, upper_bound = 100, linv = None, unroll_limit = 8):
+        """Synthesizes a program using input-output examples."""
+        ast_orig = parse(orig_program)
+
+        if(self.ast_orig is None):
+            print("Error: Invalid program")
+            return ""
+
+        pvars = sorted(list(getPvars(ast_orig)))
+        print("Pvars: ", pvars)
+
+        P, Q, examples_inputs_tuples = self.generate_conditions(inputs, outputs, pvars)
+
+        if linv is None:
+            linv = lambda d: True
+
+        holes_program, holes = self.process_holes(orig_program) # Replace all occurrences of '??' with unique hole variables, returnes program with holes vars, and holes vars list
+        print("Holes:", holes)
+        ast_holes_unrolled = parse_and_unroll(holes_program, unroll_limit)
+        if(ast_holes_unrolled is None):
+            print("Error: Invalid program")
+            return ""
+        
+        program_holes_unrolled = tree_to_program(ast_holes_unrolled)
+
+        
+        solver = Solver()
+        VC = []
+
+        wp = WP(ast_holes_unrolled)
+
+        for i in range(len(inputs)):            
+            
+            inputs_code = ""
+            for input in examples_inputs_tuples[i]:
+                print("add input key:", input[0], ":=", input[1])
+                inputs_code += f"{input[0]} := {input[1]} ; "
+
+            holes_program_with_inputs = inputs_code + program_holes_unrolled
+            print("holes_program_with_inputs: \n", holes_program_with_inputs)
+            ast_holes_inputs = parse(holes_program_with_inputs)
+
+            # wp = WP(ast_holes_inputs)
+            wp_stmt = wp.wp(ast_holes_inputs, Q[i], linv)
+
+            P_i = lambda d: True
+
+            VC_i = Implies(P_i(wp.env), wp_stmt(wp.env))
+            VC.append(VC_i)
+
+        VC = And(VC)
+        solver.add(VC)
+        
+        if solver.check() == sat:
+            print(">> The program is verified.")
+            print("holes:", str(solver.model()) )
+            filled_program = self.fill_holes(holes_program, solver)
+            filled_program, _ = self.fill_holes_with_zeros(filled_program, holes)
+            print("final program:")
+            print(filled_program) 
+            return filled_program
+        else:
+            print(">> The program is NOT verified.")
+            return ""
 
     def synth_IO_program(self, orig_program, inputs, outputs, lower_bound = -100, upper_bound = 100, linv = None, unroll_limit = 8):
         """Synthesizes a program using input-output examples."""
