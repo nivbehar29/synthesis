@@ -148,7 +148,7 @@ def verify(P: Invariant, ast: Tree, Q: Invariant, linv: Invariant):
         print("Counterexample:", str(solver.model()) )
         return False, solver
     
-def verify2(P: Invariant, ast: Tree, Q: Invariant, linv: Invariant):
+def is_exist_input_to_satisfy(P: Invariant, ast: Tree, Q: Invariant, linv: Invariant):
     """Verify a Hoare triple {P} c {Q}
     Where P, Q are assertions (see below for examples)
     and ast is the AST of the command c.
@@ -165,6 +165,8 @@ def verify2(P: Invariant, ast: Tree, Q: Invariant, linv: Invariant):
     
     solver = Solver()
     solver.add(VC)
+
+    print("Model:", solver)
 
     if solver.check() == sat:
         print(">> The program has satisfying inputs.")

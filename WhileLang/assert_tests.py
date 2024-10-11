@@ -2,7 +2,7 @@ from Synthesizer import *
 import os
 from contextlib import redirect_stdout
 import inspect
-from wp import verify, verify2
+from wp import verify
 
 RED = "\033[31m"
 GREEN = "\033[32m"
@@ -118,16 +118,16 @@ def basic_case_6():
 class NoErrorExcpected(Exception):
         pass
 
-def test_synth_program(program, P, Q, linv, expected_program, expected_error=NoErrorExcpected, to_disable_print = disable_prints, lower_bound=-100, upper_bound=100):
+def test_synth_program(program, P, Q, linv, expected_program, expected_error=NoErrorExcpected, to_disable_print = disable_prints, lower_bound=-100, upper_bound=100, unroll_limit = 10):
 
     synth = Synthesizer(program)
     try:
         if to_disable_print:
             with open(os.devnull, 'w') as f:
                 with redirect_stdout(f):
-                    returned_program = synth.synth_program(program, P, Q, linv, lower_bound, upper_bound)
+                    returned_program = synth.synth_program(program, P, Q, linv, lower_bound, upper_bound, unroll_limit)
         else:
-            returned_program = synth.synth_program(program, P, Q, linv, lower_bound, upper_bound)
+            returned_program = synth.synth_program(program, P, Q, linv, lower_bound, upper_bound, unroll_limit)
     except expected_error as e:
         returned_program = expected_error
     except Exception as e:
@@ -233,7 +233,131 @@ def holes_basic_case_6():
     expected_program = "x := 8 + 8 ; z:= x + 8;  if z = 20 then y := 8 else y := 5; assert y = 8"
     expected_error = Synthesizer.ProgramNotVerified
 
-    return test_synth_program(program, P, Q, linv, expected_program, expected_error, False, -100, 100)
+    return test_synth_program(program, P, Q, linv, expected_program, expected_error, disable_prints, -100, 100)
+
+def holes_basic_case_7():
+    program = "x:= 3; y:= ??; assert ((y - 1) > x); if (y - 3) = 5 then x := x + ?? else x:= x + 6"
+
+    P = lambda d: True
+    Q = lambda d: And(d["x"] == 8, d["y"] == 8)
+    linv = lambda d: True
+
+    expected_program = "x:= 3; y:= 8; assert ((y - 1) > x); if (y - 3) = 5 then x := x + 5 else x:= x + 6"
+    expected_error = NoErrorExcpected
+
+    return test_synth_program(program, P, Q, linv, expected_program, expected_error, disable_prints, -100, 100)
+
+def holes_no_sol_case_1():
+    program = "y:= x + ?? ; if y = 10 then x := 5 else x := 9"
+
+    P = lambda d: True
+    Q = lambda d: d["x"] == 8
+    linv = lambda d: True
+
+    expected_program = ""
+    expected_error = Synthesizer.ProgramNotVerified
+
+    return test_synth_program(program, P, Q, linv, expected_program, expected_error, disable_prints, -100, 100)
+
+def holes_no_sol_case_2():
+    program = "y := ?? ; if x < 6 then ( x := y + 4 ) else skip  ; assert x = 6"
+
+    P = lambda d: True
+    Q = lambda d: True
+    linv = lambda d: True
+
+    expected_program = ""
+    expected_error = Synthesizer.ProgramNotVerified
+
+    return test_synth_program(program, P, Q, linv, expected_program, expected_error, disable_prints, -100, 100)
+
+# def holes_while_case_1():
+#     program = "y := ?? ; while x < 6 do ( x := y + 4 ) ; assert x = 6"
+
+#     P = lambda d: True
+#     Q = lambda d: True
+#     linv = lambda d: True
+
+#     expected_program = ""
+#     expected_error = Synthesizer.NoInputToSatisfyProgram
+
+#     return test_synth_program(program, P, Q, linv, expected_program, expected_error, False, -100, 100)
+
+def holes_while_case_1():
+    program = "y := 0 ; x := 0 ; t := ?? ; while x < t do ( y := y + 1 ; x := x + 1)  ; assert y = 5"
+    P = lambda d: True
+    Q = lambda d: True
+    linv = lambda d: True
+
+    expected_program = "y := 0 ; x := 0 ; t := 5 ; while x < t do ( y := y + 1 ; x := x + 1)  ; assert y = 5"
+    expected_error = NoErrorExcpected
+
+    return test_synth_program(program, P, Q, linv, expected_program, expected_error, disable_prints, -100, 100, 10)
+
+def holes_while_case_2():
+    program = "x := 0 ; t := ?? ; while x < t do ( x := x + 1 ; assert t = 3) ; assert x > 0"
+    P = lambda d: True
+    Q = lambda d: True
+    linv = lambda d: True
+
+    expected_program = "x := 0 ; t := 3 ; while x < t do ( x := x + 1 ; assert t = 3) ; assert x > 0"
+    expected_error = NoErrorExcpected
+
+    return test_synth_program(program, P, Q, linv, expected_program, expected_error, disable_prints, -100, 100, 10)
+
+
+def holes_while_case_3():
+    program = "x := 0 ; t := ?? ; while x < t do ( x := x + ?? ; assert t = 6) ; assert x > 0 ; assert x = 9"
+    P = lambda d: True
+    Q = lambda d: True
+    linv = lambda d: True
+
+    expected_program = "x := 0 ; t := 6 ; while x < t do ( x := x + 9 ; assert t = 6) ; assert x > 0 ; assert x = 9"
+    expected_error = NoErrorExcpected
+
+    return test_synth_program(program, P, Q, linv, expected_program, expected_error, disable_prints, -100, 100, 10)
+
+def dummy():
+    program = "y := 0 ; x := 0 ; t := ?? ; while x < t do ( y := y + 1 ; x := x + 1)  ; assert y = 10"
+    # thats a problem because currently we unroll loop 10 times, and only then the program can be satisfied
+    # maybe we should unroll the loop 1, then verify, if not - unrool 2, then verify, etc
+    # do it until we reach a defined maximum bounds, like 10 or something. the maximum bound can be a parameter of the function
+
+    P = lambda d: True
+    Q = lambda d: True
+    linv = lambda d: True
+
+    expected_program = ""
+    expected_error = Synthesizer.NoInputToSatisfyProgram
+
+    # program = "x:= 0; t := hole_0 ; while x < t do ( x :=  x + 1)  ; assert x = 10"
+
+    # P = lambda d: And(d["x"] == 0)#, d["t"] == 10)
+    # Q = lambda d: True
+    # linv = lambda d: And(d["x"] <= 10)#, d["t"] == 10)
+    # is_exist_input_to_satisfy(P, parse(program), Q, linv)
+
+    # return test_synth_program(program, P, Q, linv, expected_program, expected_error, False, -100, 100)
+
+
+    # program = "x := 0; x:= hole_0; a := 0 ; while a != 1 do ( a := 1 )"# ; assert x = 10"
+    # program = "x := 0; x:= hole_0; a := 0 ; if a != 1 then ( a := 1 ) else skip ; assert x = 10"
+    # P = lambda d: True
+    # Q = lambda d: True
+    # linv = lambda d: d["x"] >= 0
+    # is_exist_input_to_satisfy(P, parse(program), Q, linv)
+
+    # why does this not verifyed?!?!
+    program = "x:=10 ; y := x + 1; a := 0 ; while a != 1 do ( a := 1 )"# ; assert x = 10"
+    P = lambda d: True
+    Q = lambda d: d["x"] == 10
+    linv = lambda d: d["x"] >= 0
+    verify(P, parse(program), Q, linv)
+
+    # program = "x:= hole_0 ; a := 0 ;assert(x >= 0); if a != 1 then ( a := 1 ) else skip ; assert(x >= 0)"
+    # res = from_assert_to_list_to_verify(program)
+    # print(res[0])
+    # print(res[1])
 
 def assert_tests():
     print("assert tests")
@@ -255,11 +379,25 @@ def assert_tests():
         holes_basic_case_4,
         holes_basic_case_5,
         holes_basic_case_6,
+        holes_basic_case_7,
+    ]
+
+    holes_no_sol_cases = [
+        holes_no_sol_case_1,
+        holes_no_sol_case_2,
+    ]
+
+    holes_while_cases = [
+        holes_while_case_1,
+        holes_while_case_2,
+        holes_while_case_3,
     ]
 
     test_cases = []
     test_cases += basic_cases
     test_cases += holes_basic_cases
+    test_cases += holes_no_sol_cases
+    test_cases += holes_while_cases
 
     results = []
 

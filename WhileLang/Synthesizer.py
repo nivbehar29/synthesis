@@ -133,7 +133,12 @@ class Synthesizer:
             # Replace each occurrence of 'key' with its corresponding 'value'
             program = program.replace(key, str(value))
         return program
-    
+
+    # def fill_zeros(ast: Tree):
+    #     if(ast.root == "id"):
+    #         if bool(re.match(r'hole_\d+$', ast.subtrees[0].root)):
+    #             ast.subtrees[0].root
+
     def fill_holes_with_zeros(self, program, holes: list):
         """Fills the holes in the program with a '0'"""
         # print("hole to fill with zeroes: ", holes)
@@ -309,6 +314,19 @@ class Synthesizer:
         else:
             return True, solver
 
+    def fill_ast_holes(self, ast: Tree, holes: dict) -> Tree:
+        if(ast.root == "id"):
+            # print(ast.root)
+            if ast.subtrees[0].root in holes:
+                # print("found hole: ", ast.subtrees[0].root)
+                ast.root = "num"
+                ast.subtrees[0].root = holes[ast.subtrees[0].root]
+                return ast
+        
+        else:
+            for child in ast.subtrees:
+                self.fill_ast_holes(child, holes)
+
     class ProgramNotValid(Exception):
         """Raised when a specific program is not valid."""
         pass
@@ -321,7 +339,7 @@ class Synthesizer:
         """Raised when a specific program can't be verified."""
         pass
 
-    def synth_program(self, orig_program, P, Q, linv = None, lower_bound = -100, upper_bound = 100):
+    def synth_program(self, orig_program, P, Q, linv = None, lower_bound = -100, upper_bound = 100, unroll_limit = 10):
         ast_orig = parse(orig_program)
 
         if(self.ast_orig is None):
@@ -352,23 +370,35 @@ class Synthesizer:
         if(ast_holes is None):
             raise self.ProgramNotValid("The given program can't be parsed")
         
-        is_there_valid_input, _ = verify2(P, ast_holes, Q, linv=linv)
-        if(is_there_valid_input == False):
-            raise self.NoInputToSatisfyProgram("The given program has no input which can satisfy the conditions")
+        # print(holes_program)
+        # is_there_valid_input, _ = is_exist_input_to_satisfy(P, ast_holes, Q, linv=linv)
+        # if(is_there_valid_input == False):
+        #     raise self.NoInputToSatisfyProgram("The given program has no input which can satisfy the conditions")
+        
+        ast_holes_unrolled = parse_and_unroll(holes_program, unroll_limit)
+        if(ast_holes_unrolled is None):
+            raise self.ProgramNotValid("The given program can't be parsed")
+        program_holes_unrolled = tree_to_program(ast_holes_unrolled)
+        print(f"program_holes_unrolled: \n{program_holes_unrolled}\n")
         
 
-        filled_program, filled_holes_dict = self.fill_holes_with_zeros(holes_program, holes)
+        # filled_program, filled_holes_dict = self.fill_holes_with_zeros(holes_program, holes)
+
+        # print("ast_unrolled_filled_with_zeros: ", ast_unrolled_filled_with_zeros)
+        filled_program, filled_holes_dict = self.fill_holes_with_zeros(program_holes_unrolled, holes)
         
 
         # this is to bound the limits of the holes - maybe we will need this for complicated programs
         bound_conditions = lambda d: True
-        if(lower_bound != None and upper_bound != None):
-            for i in range(len(holes)):
-                prev_bound_conditions = copy.deepcopy(bound_conditions)
-                print("hole key:", holes[i], "bound:", lower_bound, upper_bound)
-                bound_conditions = lambda d, hole_key=holes[i], q=prev_bound_conditions: And(q(d), d[hole_key] <= upper_bound, d[hole_key] >= lower_bound)
+        # if(lower_bound != None and upper_bound != None):
+        #     for i in range(len(holes)):
+        #         prev_bound_conditions = copy.deepcopy(bound_conditions)
+        #         print("hole key:", holes[i], "bound:", lower_bound, upper_bound)
+        #         bound_conditions = lambda d, hole_key=holes[i], q=prev_bound_conditions: And(q(d), d[hole_key] <= upper_bound, d[hole_key] >= lower_bound)
            
         final_holes_p = copy.deepcopy(bound_conditions)
+
+        new_holes_dict = {}
 
         while(True):
             print("\n*******************************************\n")
@@ -376,7 +406,22 @@ class Synthesizer:
             result, solver = verify(P, ast_filled, Q, linv=linv)
             if result == True:
                 print("The program is verified")
-                return filled_program
+                filled_program_final = self.fill_holes_dict(holes_program, new_holes_dict)
+                holes_to_fill_with_zeroes = [key for key in holes if key not in new_holes_dict.keys()]
+                print("holes to fill with zeroes:", holes_to_fill_with_zeroes)
+                filled_program_final, _ = self.fill_holes_with_zeros(filled_program_final, holes_to_fill_with_zeroes)
+                print(f"final filled program: {filled_program_final}")
+                return filled_program_final
+
+                # check that the final filled program is verified. maybe this should be done by the user
+                # final_result, _ = verify(P, parse(filled_program_final), Q, linv=linv)
+                # if(final_result == True):
+                #     print("The final program is verified")
+                #     return filled_program_final
+                # else:
+                #     print("The final program is not verified")
+                #     return ""
+                
             
             ce = self.extract_counter_example_from_dict(extract_model_assignments(solver))
             if ce == {}:
@@ -400,7 +445,7 @@ class Synthesizer:
                 print("add input key:", input_key, ":=", ce[input_key])
                 inputs_code += f"{input_key} := {ce[input_key]} ; "
 
-            holes_program_with_inputs = inputs_code + holes_program
+            holes_program_with_inputs = inputs_code + program_holes_unrolled
             ast_holes_inputs = parse(holes_program_with_inputs)
 
             holes_p = lambda d: True
@@ -431,7 +476,7 @@ class Synthesizer:
                 print("No new holes found")
                 return ""
             
-            filled_program = self.fill_holes_dict(holes_program, new_holes_dict)
+            filled_program = self.fill_holes_dict(program_holes_unrolled, new_holes_dict)
             holes_to_fill_with_zeroes = [key for key in holes if key not in new_holes_dict.keys()]
             print("holes to fill with zeroes:", holes_to_fill_with_zeroes)
             filled_program, holes_filled_with_zeroes_dict = self.fill_holes_with_zeros(filled_program, holes_to_fill_with_zeroes)
@@ -566,30 +611,19 @@ def test_assertions():
     else:
         print("GGGGGGGGGGGGGG")
 
-    
-
-
 ## end of counter example synthesis
+
 
 def main():
 
-    test_assertions()
+    # test_assertions()
 
-    # program = "b := 3 ; c := 6 ; d := b + c ; assert (a = d)"
+    program = "x:= 3; y:= hole_0 ; assert ((y - 1) > x); if (y - 3) = 5 then x := x + hole_1 else x:= x + 6"
 
-    # P = lambda d: d["a"] == 9
-    # Q = lambda d: True
-    # linv = lambda d: True
-
-    # ast = parse(program)
-    # print(ast)
-
-    # if ast is not None:
-    #     print(">> Valid program.")
-    #     # Your task is to implement "verify"
-    #     verify(P, ast, Q, linv=linv)
-    # else:
-    #     print(">> Invalid program.")
+    ast = parse(program)
+    print(ast)
+    fill_ast_holes(ast, {'hole_0': 111111, 'hole_1': 22222})
+    print(ast)
 
 
 if __name__ == "__main__":

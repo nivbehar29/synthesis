@@ -143,7 +143,11 @@ def tree_to_program(tree: Tree) -> str:
         body = tree_to_program(tree.subtrees[1])
         return f"while {cond} do {body}"
     
-    elif tree.root in ["+", "-", "*", "/", ">", "<", ">=", "<=", "==", "!=", "op"]:  # Binary operation
+    elif tree.root == "assert":  # Assert statement
+        cond = tree_to_program(tree.subtrees[0])
+        return f"assert {cond}"
+    
+    elif tree.root in ["+", "-", "*", "/", ">", "<", ">=", "<=", "==", "!=", "op", "="]:  # Binary operation
         left = tree_to_program(tree.subtrees[0])
         operator = tree.root  # Use the operator directly from the tree root
         right = tree_to_program(tree.subtrees[1])
