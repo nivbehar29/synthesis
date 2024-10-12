@@ -144,7 +144,6 @@ def verify(P: Invariant, ast: Tree, Q: Invariant, linv: Invariant):
     Also prints the counterexample (model) returned from Z3 in case
     it is not.
     """
-
     wp = WP(ast)
     wp_stmt = wp.wp(ast, Q, linv)
 

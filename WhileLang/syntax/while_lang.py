@@ -138,12 +138,12 @@ def tree_to_program(tree: Tree) -> str:
         cond = tree_to_program(tree.subtrees[0])
         then_part = tree_to_program(tree.subtrees[1])
         else_part = tree_to_program(tree.subtrees[2])
-        return f"{tree.root} {cond} then {then_part} else {else_part}"
+        return f"{tree.root} {cond} then ({then_part}) else ({else_part})"
     
     elif tree.root == "while":  # While loop
         cond = tree_to_program(tree.subtrees[0])
         body = tree_to_program(tree.subtrees[1])
-        return f"while {cond} do {body}"
+        return f"while {cond} do ({body})"
     
     elif tree.root == "assert":  # Assert statement
         cond = tree_to_program(tree.subtrees[0])
@@ -188,3 +188,38 @@ def ast_to_string(ast: Tree) -> str:
         str: The program as a string.
     """
     return tree_to_program(ast)
+
+def remove_assertions_ast(ast):
+    if(ast is None):
+        return None
+
+    if ast.root == "assert":
+        return None
+    else:
+        new_subtrees = []
+        for subtree in ast.subtrees:
+            new_subtree = remove_assertions_ast(subtree)
+            if new_subtree is not None:
+                new_subtrees.append(new_subtree)
+        ast.subtrees = new_subtrees
+
+        if ast.root == ';' and len(ast.subtrees) == 1:
+            ast = ast.subtrees[0]
+        elif ast.root == ';' and len(ast.subtrees) == 0:
+            ast = None
+
+    return ast
+
+def remove_assertions_program(program):
+    ast = parse(program)
+    if ast is None:
+        return None
+    print(f"ast_old: {ast}")
+    ast_new = remove_assertions_ast(ast)
+    print(f"ast_new: {ast_new}")
+
+    if(ast_new is None):
+        return None
+    
+    program_new = tree_to_program(ast_new)
+    return program_new

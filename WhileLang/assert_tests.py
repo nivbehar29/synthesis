@@ -311,6 +311,9 @@ def holes_while_case_3():
     P = lambda d: True
     Q = lambda d: True
     linv = lambda d: True
+    # And(d['x'] >= 0, d['t'] == 6)
+    # d['x'] == 9
+
 
     expected_program = "x := 0 ; t := 6 ; while x < t do ( x := x + 9 ; assert t = 6) ; assert x > 0 ; assert x = 9"
     expected_error = NoErrorExcpected
@@ -322,6 +325,7 @@ def dummy():
     # thats a problem because currently we unroll loop 10 times, and only then the program can be satisfied
     # maybe we should unroll the loop 1, then verify, if not - unrool 2, then verify, etc
     # do it until we reach a defined maximum bounds, like 10 or something. the maximum bound can be a parameter of the function
+# x := 0 ; assert x < 0 ; assert x > 0
 
     P = lambda d: True
     Q = lambda d: True
@@ -359,10 +363,24 @@ def dummy():
     # print(res[0])
     # print(res[1])
 
-    linv = lambda d: d["x"] >= 0
-    from syntax.while_lang import WhileParser
-    parsed_linv = WhileParser()("assert(" + "x = 3" + ")")
-    print(parsed_linv)
+    # program = "while x < t do y := y + 1 ; x := x + 1 ; assert y = 5 ; x := 0"
+
+    # ast = parse(program)
+    
+    # if(ast is not None):
+    #     program_new = tree_to_program(ast)
+    #     ast_new = parse(program_new)
+
+    #     print(f"ast_old: {ast}")
+    #     print(f"ast_new: {ast_new}")
+    #     print(f"program_old: {program}")
+    #     print(f"program_new: {program_new}")
+
+    program = " x:= 0 ;assert x > 0 ; assert x = 9"
+    print("program_old: ", program)
+
+    program_new = remove_assertions_program(program)
+    print("program_new: ", program_new)
 
 def assert_tests():
     print("assert tests")

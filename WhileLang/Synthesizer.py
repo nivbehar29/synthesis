@@ -5,7 +5,7 @@ from z3 import Int, ForAll, Implies, Not, And, Solver, unsat, sat, Ast, Or
 #from WhileLang import syntax
 
 from syntax.tree import Tree
-from syntax.while_lang import parse, parse_and_unroll, tree_to_program
+from syntax.while_lang import parse, parse_and_unroll, tree_to_program, remove_assertions_program
 from wp import *
 
 import re
@@ -402,6 +402,10 @@ class Synthesizer:
         """Raised when a specific program is not valid."""
         pass
 
+    class ProgramHasNoHoles(Exception):
+        """Raised when a specific program has no holes."""
+        pass
+    
     class ProgramNotVerified(Exception):
         """Raised when a specific program can't be verified."""
         pass
@@ -411,10 +415,22 @@ class Synthesizer:
         pass
 
     def synth_program(self, orig_program, P, Q, linv = None, lower_bound = -100, upper_bound = 100, unroll_limit = 10):
-        ast_orig = parse(orig_program)
 
+        print("******\n")
+
+        ast_orig = parse(orig_program)
         if(self.ast_orig is None):
             raise self.ProgramNotValid("The given program can't be parsed")
+        
+        program_without_assertions = remove_assertions_program(orig_program)
+        print("program_without_assertions: ", program_without_assertions)
+        if program_without_assertions == None:
+            raise self.ProgramNotValid("The given program can't be parsed")
+        ast_without_assertion = parse(program_without_assertions)
+        if(ast_without_assertion is None):
+            raise self.ProgramNotValid("The given program can't be parsed")
+
+
 
         pvars = sorted(list(getPvars(ast_orig)))
         print("Pvars: ", pvars)
@@ -432,10 +448,11 @@ class Synthesizer:
 
         if(holes == []):
             print("No holes found in the program. trying to verify the program")
-            is_verified, _ = verify(P, ast_orig, Q, linv=linv)
-            if(is_verified == False):
-                raise self.ProgramNotVerified("The given program is not verified for all inputs")
-            return orig_program
+            raise self.ProgramHasNoHoles("The given program has no holes in it")
+            # is_verified, _ = verify(P, ast_orig, Q, linv=linv)
+            # if(is_verified == False):
+            #     raise self.ProgramNotVerified("The given program is not verified for all inputs")
+            # return orig_program
 
         ast_holes = parse(holes_program)
         if(ast_holes is None):
@@ -538,7 +555,7 @@ class Synthesizer:
             # result, solver = self.find_holes(ast_holes, final_P, Q, linv=linv)
             result, solver = self.find_holes(ast_holes_inputs, final_P, Q, linv=linv)
             if result == False:
-                raise self.ProgramNotVerified("The given program is not verified for all inputs")
+                raise self.ProgramNotVerified("The given program can't be verified for all possible inputs")
             else:
                 print("holes:", solver.model())
             
