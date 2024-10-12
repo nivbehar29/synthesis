@@ -17,13 +17,14 @@ class CEGIS_Tab:
         self.Q_str = "True"
         self.linv_str = "True"
 
+        self.loop_unrolling_entry = None
+
         self.name = "CEGIS"
         self.root = None
-        self.message_text = None
+        self.message_text : tk.Text = None
+        self.output_text : tk.Text = None
+        self.program_input : tk.Text = None
         self.verify_program_button = None
-        self.output_text = None
-        self.loop_unrolling_entry = None
-        self.program_input = None
 
     # Global variable to keep track of the conditions window
     conditions_window = None
@@ -85,6 +86,32 @@ def run_verifier(program_text, queue, P_str = None, Q_str = None, linv_str = Non
     except Exception as e:
         queue.put(e)
 
+# Function to cancel a process running in the background
+def cancel_process(wait_window):
+    global process
+
+    if process and process.is_alive():
+        print("Cancelling the process...")
+        process.terminate()  # Terminate the child process
+        process.join()  # Wait for it to finish
+        print("Process terminated.")
+    
+    wait_window.destroy()  # Close the wait window
+
+# Function to create the "Please Wait" window
+def create_wait_window(root, wait_window_text, cancel_callback):
+    # Show the "Please Wait" window
+    wait_window = tk.Toplevel(root)
+    wait_window.title("Please Wait")
+    wait_window.geometry("300x100")
+    wait_label = tk.Label(wait_window, text=wait_window_text, font=("Helvetica", 12))
+    wait_label.pack(pady=20)
+
+    cancel_button = tk.Button(wait_window, text="Cancel", command = lambda: cancel_callback(wait_window))
+    cancel_button.pack(pady=10)
+
+    return wait_window
+
 # Function to handle the button press
 def process_assertion_program_input():
 
@@ -96,27 +123,25 @@ def process_assertion_program_input():
     try:
         loop_unrolling_limit = int(cegis.loop_unrolling_entry.get())  # Try to convert to integer
     except Exception:
-        cegis.message_text.insert("1.0", "Error: Loop unrolling limit must be an integer.")  # Display error message
-        cegis.message_text.config(state='disabled')  # Make it non-editable again
+        set_disabled_window_text_flash(cegis.message_text, "Error: Loop unrolling limit must be an integer.", True)
         return 
 
     program_text = cegis.program_input.get("1.0", tk.END).strip()  # Get text from input area
 
     # Check if the loop unrolling limit is less than 0
     if loop_unrolling_limit < 0:
-        cegis.message_text.insert("1.0", "Error: Loop unrolling limit must be greater than or equal to 0.")  # Display error message
-        cegis.message_text.config(state='disabled')  # Make it non-editable again
+        set_disabled_window_text_flash(cegis.message_text, "Error: Loop unrolling limit must be greater than or equal to 0.", True)
         return
+
+    queue = multiprocessing.Queue()
+    process = multiprocessing.Process(target = run_synthesis, args=(program_text, queue, loop_unrolling_limit, cegis.P_str, cegis.Q_str, cegis.linv_str))
+    process.start()
 
     # Create a wait window which will be destroyed after the synthesis is done. Also pass it a callback function to cancel the synthesis
     wait_window = create_wait_window(cegis.root,"Please wait while synthesizing...", cancel_process)
 
     # Prevent pressing the main window while the wait window is open
     wait_window.grab_set()
-
-    queue = multiprocessing.Queue()
-    process = multiprocessing.Process(target = run_synthesis, args=(program_text, queue, loop_unrolling_limit, cegis.P_str, cegis.Q_str, cegis.linv_str))
-    process.start()
 
     # Function to check the process status, waiting for it to finish and then display the result
     def check_process():
@@ -156,21 +181,14 @@ def process_assertion_program_input():
                     final_output = remove_assertions_program(synth_result)
 
                 if(error != ""):
-                    cegis.message_text.config(state='normal')  # Make output editable
-                    cegis.message_text.delete('1.0', tk.END)  # Clear previous output
-                    cegis.message_text.insert("1.0", error)  # Display the synthesized program
-                    cegis.message_text.config(state='disabled')  # Make the output non-editable again
-                    cegis.verify_program_button.config(state='disabled')  # Enable the button
-                    cegis.output_text.config(state='normal')  # Make output editable
-                    cegis.output_text.delete('1.0', tk.END)  # Clear previous output
-                    cegis.output_text.config(state='disabled')  # Make the output non-editable again
-                if(final_output != ""):
-                    cegis.output_text.config(state='normal')  # Make output editable
-                    cegis.output_text.delete('1.0', tk.END)  # Clear previous output
-                    cegis.output_text.insert("1.0", final_output)  # Display the synthesized program
-                    cegis.output_text.config(state='disabled')  # Make the output non-editable again
-                    cegis.verify_program_button.config(state='normal')  # Enable the button
+                    set_disabled_window_text_flash(cegis.message_text, error, True)
+                    cegis.verify_program_button.config(state='disabled')  # Disable the button
+                    set_disabled_window_text(cegis.output_text, "")
 
+                if(final_output != ""):
+                    set_disabled_window_text_flash(cegis.message_text, "The program has been synthesized successfully", False)
+                    set_disabled_window_text(cegis.output_text, final_output)
+                    cegis.verify_program_button.config(state='normal')  # Enable the button
 
     check_process()
 
@@ -210,15 +228,14 @@ def verify_output_program(tab):
                 # Get the result from the queue
                 verifier_result = queue.get()
                 final_output = ""
+                error = False
                 if isinstance(verifier_result, Exception):
                     final_output = f"An unexpected error occurred: {verifier_result}"
+                    error = True
                 else:
                     print("Verifier result:", verifier_result)
                     final_output = verifier_result
 
-                tab.message_text.config(state='normal')  # Make output editable
-                tab.message_text.delete('1.0', tk.END)  # Clear previous output
-                tab.message_text.insert("1.0", final_output)  # Display the synthesized program
-                tab.message_text.config(state='disabled')  # Make the output non-editable again
+                set_disabled_window_text_flash(tab.message_text, final_output, error)
 
     check_process()

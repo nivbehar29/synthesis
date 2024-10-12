@@ -325,7 +325,6 @@ def dummy():
     # thats a problem because currently we unroll loop 10 times, and only then the program can be satisfied
     # maybe we should unroll the loop 1, then verify, if not - unrool 2, then verify, etc
     # do it until we reach a defined maximum bounds, like 10 or something. the maximum bound can be a parameter of the function
-# x := 0 ; assert x < 0 ; assert x > 0
 
     P = lambda d: True
     Q = lambda d: True

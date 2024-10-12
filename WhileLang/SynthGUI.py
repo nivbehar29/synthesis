@@ -109,6 +109,10 @@ def create_pbe_tab():
     synthesize_button = tk.Button(pbe_frame, text="Synthesize with PBE", command=lambda : True)
     synthesize_button.pack(pady=20)
 
+    # Add a Button to open the examples window
+    open_window_button = tk.Button(pbe_frame, text="Set Examples", command=lambda: set_examples_routine(pbe))
+    open_window_button.pack(pady=10)
+
     return add_condition_button
 
 # Create buttons below the output window

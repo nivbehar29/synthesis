@@ -6,31 +6,7 @@ from z3 import ForAll, Implies, Not, And, Or
 # Wait Window
 # ------------------------------
 
-# Function to cancel a process running in the background
-def cancel_process(wait_window):
-    global process
 
-    if process and process.is_alive():
-        print("Cancelling the process...")
-        process.terminate()  # Terminate the child process
-        process.join()  # Wait for it to finish
-        print("Process terminated.")
-    
-    wait_window.destroy()  # Close the wait window
-
-# Function to create the "Please Wait" window
-def create_wait_window(root, wait_window_text, cancel_callback):
-    # Show the "Please Wait" window
-    wait_window = tk.Toplevel(root)
-    wait_window.title("Please Wait")
-    wait_window.geometry("300x100")
-    wait_label = tk.Label(wait_window, text=wait_window_text, font=("Helvetica", 12))
-    wait_label.pack(pady=20)
-
-    cancel_button = tk.Button(wait_window, text="Cancel", command = lambda: cancel_callback(wait_window))
-    cancel_button.pack(pady=10)
-
-    return wait_window
 
 # ------------------------------
 # Conditions Window
@@ -38,10 +14,7 @@ def create_wait_window(root, wait_window_text, cancel_callback):
 
 # Reset condition button logic
 def reset_condition(tab, cond_type : str, input_window):
-    tab.message_text.config(state='normal')  # Make output editable
-    tab.message_text.delete('1.0', tk.END)  # Clear previous output
-    tab.message_text.insert("1.0", f"{cond_type}: \"True\" has been set successfully.\n")
-    tab.message_text.config(state='disabled')  # Make the output non-editable again
+    set_disabled_window_text_flash(tab.message_text, f"{cond_type}: \"True\" has been set successfully.\n", error=False)
 
     input_window.delete('1.0', tk.END)  # Clear previous condition
     input_window.insert("1.0", "True")  # Set new condition
@@ -59,23 +32,17 @@ def reset_condition(tab, cond_type : str, input_window):
 # Set condition button logic
 def set_condition(tab, cond_text, cond_type : str):
     cond = None
-    # cond_text = input.get("1.0", tk.END).strip()
 
     # Try to evaluate the loop invariant using eval() in a safe environment
     safe_env = {
         'And': And, 'Or': Or, 'Implies': Implies, 'Not': Not, 'ForAll': ForAll
     }
 
-    tab.message_text.config(state='normal')  # Make output editable
-    tab.message_text.delete('1.0', tk.END)  # Clear previous output
-
     try:
         cond = eval("lambda d: " + cond_text, safe_env)  # Evaluate in Z3 context
-        tab.message_text.insert("1.0", f"{cond_type}: \"{cond_text}\" has been set successfully.\n")
+        set_disabled_window_text_flash(tab.message_text, f"{cond_type}: \"{cond_text}\" has been set successfully.\n", error=False)
     except Exception as e:
-        tab.message_text.insert("1.0", f"Error: Invalid {cond_type}: {e}\n")
-        
-    tab.message_text.config(state='disabled')  # Make the output non-editable again
+        set_disabled_window_text_flash(tab.message_text, f"Error: Invalid {cond_type}: {e}\n", error=True)
 
     if(cond != None):
         if(cond_type == "Pre-Condition"):
@@ -188,3 +155,25 @@ def eval_conditions(P_str, Q_str, linv_str):
         linv = eval("lambda d:" + linv_str, safe_env)
 
     return P, Q, linv
+
+# Function to flash a text widget
+def flash_text_widget(text_widget, original_color, flash_color="yellow", flash_duration=200):
+    # Change to the flash color
+    text_widget.config(bg=flash_color)
+
+    # After a delay, change it back to the original color
+    text_widget.after(flash_duration, lambda: text_widget.config(bg=original_color))
+
+def set_disabled_window_text(window: tk.Text, text: str):
+    window.config(state='normal')  # Make output editable
+    window.delete('1.0', tk.END)  # Clear previous output
+    window.insert("1.0", text)  # Display new text
+    window.config(state='disabled')  # Make it non-editable again
+
+def set_disabled_window_text_flash(window: tk.Text, text: str, error = False):
+    set_disabled_window_text(window, text)  # Display the text
+    if error:
+        flash_color = 'red'
+    else:
+        flash_color = 'lightgreen'
+    flash_text_widget(window, 'lightgray', flash_color)  # Flash the text widget to indicate the change
