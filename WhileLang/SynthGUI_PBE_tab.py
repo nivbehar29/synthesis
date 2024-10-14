@@ -110,22 +110,23 @@ def add_example(tab: PBE_Tab, example_frames, parameters, existing_example=None)
     input_entry_vars = {}
     output_entry_vars = {}
 
-    for param in parameters:
-        tk.Label(example_frame, text=param).pack(side=tk.LEFT, padx=5)
+    if parameters != None:
+        for param in parameters:
+            tk.Label(example_frame, text=param).pack(side=tk.LEFT, padx=5)
 
-        input_var = tk.Entry(example_frame, width=5)
-        input_var.pack(side=tk.LEFT, padx=5)
-        output_var = tk.Entry(example_frame, width=5)
-        output_var.pack(side=tk.LEFT, padx=5)
+            input_var = tk.Entry(example_frame, width=5)
+            input_var.pack(side=tk.LEFT, padx=5)
+            output_var = tk.Entry(example_frame, width=5)
+            output_var.pack(side=tk.LEFT, padx=5)
 
-        input_entry_vars[param] = input_var
-        output_entry_vars[param] = output_var
+            input_entry_vars[param] = input_var
+            output_entry_vars[param] = output_var
 
-        # Populate fields if existing example is provided
-        if existing_example:
-            input_value, output_value = existing_example.get(param, ('', ''))
-            input_var.insert(0, input_value)
-            output_var.insert(0, output_value)
+            # Populate fields if existing example is provided
+            if existing_example:
+                input_value, output_value = existing_example.get(param, ('', ''))
+                input_var.insert(0, input_value)
+                output_var.insert(0, output_value)
 
     # Add delete button for each example
     delete_button = tk.Button(example_frame, text="Delete", command=lambda: delete_example(example_frames, example_frame))
@@ -181,12 +182,14 @@ def set_examples_routine(tab: PBE_Tab):
         set_disabled_window_text_flash(tab.message_text, "Error: Invalid program. Please enter a valid program.", True)
         return
     
-    parameters = getPvars(ast)
+    parameters = list(getPvars(ast))
+    parameters.sort()
+    print("parameters:", parameters)
 
     # get the parameters
     if parameters != tab.parameters:
         print("deifferent parameters - delete current examples")
-        tab.parameters = getPvars(ast)
+        tab.parameters = parameters
         tab.examples = []
 
     open_examples_window(tab, tab.parameters, tab.examples)
@@ -265,6 +268,24 @@ def process_pbe_program_input():
     if loop_unrolling_limit < 0:
         set_disabled_window_text_flash(pbe.message_text, "Error: Loop unrolling limit must be greater than or equal to 0.", True)
         return
+
+    # Check if the program is valid
+    # Also check if the program has the same parameters as the examples
+    try:
+        ast = parse(program_text)
+        if ast is None:
+            set_disabled_window_text_flash(pbe.message_text, "Error: Invalid program. Please enter a valid program.", True)
+            return
+    
+        parameters = list(getPvars(ast))
+        parameters.sort()
+
+        if(pbe.parameters != [] and parameters != pbe.parameters):
+            set_disabled_window_text_flash(pbe.message_text, "Error: The program has different parameters than the examples. Please set examples and then synthesize", True)
+            return
+    except Exception as e:
+        set_disabled_window_text_flash(pbe.message_text, f"Error: unexpected error: {e}", True)
+        return 
 
     queue = multiprocessing.Queue()
     print(pbe.inputs_examples_synth_format)
