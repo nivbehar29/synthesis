@@ -31,7 +31,7 @@ class CEGIS_Tab:
 
 cegis = CEGIS_Tab()
 
-def synth_program(program, P, Q, linv, debug=False, unroll_limit=10):
+def synth_program_cegis(program, P, Q, linv, debug=False, unroll_limit=10):
     returned_program = ""
     synth = Synthesizer(program)
     if not debug:
@@ -43,12 +43,12 @@ def synth_program(program, P, Q, linv, debug=False, unroll_limit=10):
 
     return returned_program
 
-def run_synthesis(program_text, queue, loop_unrolling_limit, P_str = None, Q_str = None, linv_str = None):
+def run_synthesis_cegis(program_text, queue, loop_unrolling_limit, P_str = None, Q_str = None, linv_str = None):
 
     P, Q, linv = eval_conditions(P_str, Q_str, linv_str)
 
     try:
-        returned_program = synth_program(program_text, P, Q, linv, True, loop_unrolling_limit)
+        returned_program = synth_program_cegis(program_text, P, Q, linv, True, loop_unrolling_limit)
 
         print("Synthesis successful.")
         queue.put(returned_program)
@@ -87,7 +87,7 @@ def run_verifier(program_text, queue, P_str = None, Q_str = None, linv_str = Non
         queue.put(e)
 
 # Function to cancel a process running in the background
-def cancel_process(wait_window):
+def cancel_process_cegis(wait_window):
     global process
 
     if process and process.is_alive():
@@ -99,7 +99,7 @@ def cancel_process(wait_window):
     wait_window.destroy()  # Close the wait window
 
 # Function to create the "Please Wait" window
-def create_wait_window(root, wait_window_text, cancel_callback):
+def create_wait_window_cegis(root, wait_window_text, cancel_callback):
     # Show the "Please Wait" window
     wait_window = tk.Toplevel(root)
     wait_window.title("Please Wait")
@@ -134,11 +134,11 @@ def process_assertion_program_input():
         return
 
     queue = multiprocessing.Queue()
-    process = multiprocessing.Process(target = run_synthesis, args=(program_text, queue, loop_unrolling_limit, cegis.P_str, cegis.Q_str, cegis.linv_str))
+    process = multiprocessing.Process(target = run_synthesis_cegis, args=(program_text, queue, loop_unrolling_limit, cegis.P_str, cegis.Q_str, cegis.linv_str))
     process.start()
 
     # Create a wait window which will be destroyed after the synthesis is done. Also pass it a callback function to cancel the synthesis
-    wait_window = create_wait_window(cegis.root,"Please wait while synthesizing...", cancel_process)
+    wait_window = create_wait_window_cegis(cegis.root,"Please wait while synthesizing...", cancel_process_cegis)
 
     # Prevent pressing the main window while the wait window is open
     wait_window.grab_set()
@@ -201,7 +201,7 @@ def verify_output_program(tab):
     program_text = tab.output_text.get("1.0", tk.END).strip()  # Get text from output area
 
     # Create a wait window which will be destroyed after the synthesis is done. Also pass it a callback function to cancel the synthesis
-    wait_window = create_wait_window(tab.root, "Please wait while synthesizing...", cancel_process)
+    wait_window = create_wait_window_cegis(tab.root, "Please wait while synthesizing...", cancel_process_cegis)
 
     # Prevent pressing the main window while the wait window is open
     wait_window.grab_set()

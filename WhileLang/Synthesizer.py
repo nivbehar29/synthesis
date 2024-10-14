@@ -167,7 +167,7 @@ class Synthesizer:
         non_holes_dict = {k: v for k, v in dict.items() if not hole_pattern.match(k)}
         return non_holes_dict
 
-    def synth_IO_program_new(self, orig_program, inputs, outputs, lower_bound = -100, upper_bound = 100, linv = None, unroll_limit = 8):
+    def synth_IO_program(self, orig_program, inputs, outputs, lower_bound = -100, upper_bound = 100, linv = None, unroll_limit = 8):
         """Synthesizes a program using input-output examples."""
         ast_orig = parse(orig_program)
 
@@ -232,7 +232,7 @@ class Synthesizer:
             print(">> The program is NOT verified.")
             return ""
 
-    def synth_IO_program(self, orig_program, inputs, outputs, lower_bound = -100, upper_bound = 100, linv = None, unroll_limit = 8):
+    def synth_IO_program_old(self, orig_program, inputs, outputs, lower_bound = -100, upper_bound = 100, linv = None, unroll_limit = 8):
         """Synthesizes a program using input-output examples."""
         ast_orig = parse(orig_program)
 

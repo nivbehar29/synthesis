@@ -45,13 +45,12 @@ def convert_examples_to_synthersizer_format(examples):
     synth_inputs = []
     synth_outputs = []
     for example in examples:
-        synth_input = [(param, example[param][0]) for param in example]
-        synth_output = [(param, example[param][1]) for param in example]
+        synth_input = [(param, int(example[param][0])) for param in example if example[param][0] != '']
+        synth_output = [(param, int(example[param][1])) for param in example if example[param][1] != '']
         synth_inputs.append(synth_input)
         synth_outputs.append(synth_output)
 
     return synth_inputs, synth_outputs
-
 
 def is_int(value):
     try:
@@ -191,3 +190,129 @@ def set_examples_routine(tab: PBE_Tab):
         tab.examples = []
 
     open_examples_window(tab, tab.parameters, tab.examples)
+
+
+def synth_program_pbe(program, P, Q, linv, inputs_examples, output_examples, debug=False, unroll_limit=10):
+    returned_program = ""
+    synth = Synthesizer(program)
+    if not debug:
+        with open(os.devnull, 'w') as f:
+            with redirect_stdout(f):
+                for ex_in, ex_out in zip(inputs_examples, output_examples):
+                    synth.add_io_example(ex_in, ex_out)
+                returned_program = synth.synth_IO_program(program, synth.inputs, synth.outputs, -100, 100, linv, unroll_limit)
+    else:
+        for ex_in, ex_out in zip(inputs_examples, output_examples):
+            synth.add_io_example(ex_in, ex_out)
+        returned_program = synth.synth_IO_program(program, synth.inputs, synth.outputs, -100, 100, linv, unroll_limit)
+
+    return returned_program
+
+def run_synthesis_pbe(program_text, queue, loop_unrolling_limit, inputs_examples, output_examples, P_str = None, Q_str = None, linv_str = None):
+
+    P, Q, linv = eval_conditions(P_str, Q_str, linv_str)
+
+    try:
+        returned_program = synth_program_pbe(program_text, P, Q, linv, inputs_examples, output_examples, True, loop_unrolling_limit)
+        queue.put(returned_program)
+    except Exception as e:
+        queue.put(e)
+
+# Function to cancel a process running in the background
+def cancel_process_pbe(wait_window):
+    global process_pbe
+
+    if process_pbe and process_pbe.is_alive():
+        print("Cancelling the process...")
+        process_pbe.terminate()  # Terminate the child process
+        process_pbe.join()  # Wait for it to finish
+        print("Process terminated.")
+    
+    wait_window.destroy()  # Close the wait window
+
+# Function to create the "Please Wait" window
+def create_wait_window_pbe(root, wait_window_text, cancel_callback):
+    # Show the "Please Wait" window
+    wait_window = tk.Toplevel(root)
+    wait_window.title("Please Wait")
+    wait_window.geometry("300x100")
+    wait_label = tk.Label(wait_window, text=wait_window_text, font=("Helvetica", 12))
+    wait_label.pack(pady=20)
+
+    cancel_button = tk.Button(wait_window, text="Cancel", command = lambda: cancel_callback(wait_window))
+    cancel_button.pack(pady=10)
+
+    return wait_window
+
+# Function to handle the button press
+def process_pbe_program_input():
+
+    print("process_pbe_program_input")
+    global process_pbe
+
+    pbe.message_text.config(state='normal')  # Make output editable
+    pbe.message_text.delete('1.0', tk.END)  # Clear previous output
+
+    try:
+        loop_unrolling_limit = int(pbe.loop_unrolling_entry.get())  # Try to convert to integer
+    except Exception:
+        set_disabled_window_text_flash(pbe.message_text, "Error: Loop unrolling limit must be an integer.", True)
+        return 
+
+    program_text = pbe.program_input.get("1.0", tk.END).strip()  # Get text from input area
+
+    # Check if the loop unrolling limit is less than 0
+    if loop_unrolling_limit < 0:
+        set_disabled_window_text_flash(pbe.message_text, "Error: Loop unrolling limit must be greater than or equal to 0.", True)
+        return
+
+    queue = multiprocessing.Queue()
+    print(pbe.inputs_examples_synth_format)
+    print(pbe.outputs_examples_synth_format)
+    process_pbe = multiprocessing.Process(target = run_synthesis_pbe, args=(program_text, queue, loop_unrolling_limit, pbe.inputs_examples_synth_format, pbe.outputs_examples_synth_format, pbe.P_str, pbe.Q_str, pbe.linv_str))
+    process_pbe.start()
+
+    # Create a wait window which will be destroyed after the synthesis is done. Also pass it a callback function to cancel the synthesis
+    wait_window = create_wait_window_pbe(pbe.root,"Please wait while synthesizing...", cancel_process_pbe)
+
+    # Prevent pressing the main window while the wait window is open
+    wait_window.grab_set()
+
+    # Function to check the process status, waiting for it to finish and then display the result
+    def check_process():
+
+        if process_pbe.is_alive():
+            # Schedule the next check after 100 ms
+            pbe.root.after(100, check_process)
+        else:
+            print("check_process: process has finished.")
+            # Code here will execute only after the process has finished
+
+            # Close the wait window and display the result
+            wait_window.destroy()
+
+            if not queue.empty():
+
+                # Get the result from the queue
+                synth_result = queue.get()
+                final_output = ""
+                error = ""
+                if isinstance(synth_result, Exception):
+                    error = f"An unexpected error occurred: {synth_result}"
+                elif synth_result == "":
+                    error = f"Synthesizing failed."
+                else:
+                    print("Synthesis result:", synth_result)
+                    final_output = synth_result
+
+                if(error != ""):
+                    set_disabled_window_text_flash(pbe.message_text, error, True)
+                    # pbe.verify_program_button.config(state='disabled')  # Disable the button
+                    set_disabled_window_text(pbe.output_text, "")
+
+                if(final_output != ""):
+                    set_disabled_window_text_flash(pbe.message_text, "The program has been synthesized successfully", False)
+                    set_disabled_window_text(pbe.output_text, final_output)
+                    # pbe.verify_program_button.config(state='normal')  # Enable the button
+
+    check_process()

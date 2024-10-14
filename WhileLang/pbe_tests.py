@@ -13,7 +13,7 @@ def synthesize_io_program(orig_program, inputs_examples, output_examples, lower_
     synth = Synthesizer(orig_program)
     for ex_in, ex_out in zip(inputs_examples, output_examples):
         synth.add_io_example(ex_in, ex_out)
-    return synth.synth_IO_program_new(synth.orig_program, synth.inputs, synth.outputs, lower_bound, upper_bound, linv, unroll_limit)
+    return synth.synth_IO_program(synth.orig_program, synth.inputs, synth.outputs, lower_bound, upper_bound, linv, unroll_limit)
 
 def get_io_program(orig_program, inputs_examples, output_examples, to_disable_print, lower_bound, upper_bound, linv = None, unroll_limit = 8):
     
@@ -55,7 +55,7 @@ def linear_case_1():
     output_examples = [[("d", 1)],
                        [("d", 1)]]
 
-    output_program = get_io_program(orig_program, inputs_examples, output_examples, disable_prints, -4, 50)
+    output_program = get_io_program(orig_program, inputs_examples, output_examples, False, -4, 50)
     
 
     assertion = output_program == expected_program

@@ -106,7 +106,7 @@ def create_pbe_tab():
     add_condition_button.pack(pady=5)
 
     # Add a button to trigger synthesis in the PBE mode
-    synthesize_button = tk.Button(pbe_frame, text="Synthesize with PBE", command=lambda : True)
+    synthesize_button = tk.Button(pbe_frame, text="Synthesize with PBE", command=lambda : process_pbe_program_input())
     synthesize_button.pack(pady=20)
 
     # Add a Button to open the examples window
