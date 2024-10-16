@@ -29,11 +29,16 @@ class PBE_Tab:
         self.output_text : tk.Text = None
         self.program_input : tk.Text = None
 
-    # Global variable to keep track of the conditions window
-    conditions_window = None
+        self.verify_program_button = None
 
-    # Global variable to keep track of the conditions window
-    examples_window = None
+        # Global variable to keep track of the conditions window
+        self.conditions_window = None
+
+        # Global variable to keep track of the conditions window
+        self.examples_window = None
+
+        # Variable to keep track if a verification process has been canceled or not
+        self.verification_cancelled = False
 
 pbe = PBE_Tab()
 
@@ -203,11 +208,11 @@ def synth_program_pbe(program, P, Q, linv, inputs_examples, output_examples, deb
             with redirect_stdout(f):
                 for ex_in, ex_out in zip(inputs_examples, output_examples):
                     synth.add_io_example(ex_in, ex_out)
-                returned_program = synth.synth_IO_program(program, synth.inputs, synth.outputs, -100, 100, P, Q, linv, unroll_limit)
+                returned_program = synth.synth_IO_program(program, synth.inputs, synth.outputs, -100, 100, P, Q, linv, unroll_limit, True)
     else:
         for ex_in, ex_out in zip(inputs_examples, output_examples):
             synth.add_io_example(ex_in, ex_out)
-        returned_program = synth.synth_IO_program(program, synth.inputs, synth.outputs, -100, 100, P, Q,  linv, unroll_limit)
+        returned_program = synth.synth_IO_program(program, synth.inputs, synth.outputs, -100, 100, P, Q,  linv, unroll_limit, True)
 
     return returned_program
 
@@ -218,8 +223,18 @@ def run_synthesis_pbe(program_text, queue, loop_unrolling_limit, inputs_examples
     try:
         returned_program = synth_program_pbe(program_text, P, Q, linv, inputs_examples, output_examples, True, loop_unrolling_limit)
         queue.put(returned_program)
+    except (Synthesizer.ProgramNotValid, Synthesizer.ProgramNotVerified, Synthesizer.ProgramHasNoHoles) as e:
+        print("run_synthesis_cegis raised an exception:", e)
+        queue.put(e)
     except Exception as e:
         queue.put(e)
+
+def run_synthesis_pbe_no_process(program_text, loop_unrolling_limit, inputs_examples, output_examples, P_str = None, Q_str = None, linv_str = None):
+
+    P, Q, linv = eval_conditions(P_str, Q_str, linv_str)
+
+    returned_program = synth_program_pbe(program_text, P, Q, linv, inputs_examples, output_examples, True, loop_unrolling_limit)
+
 
 # Function to cancel a process running in the background
 def cancel_process_pbe(wait_window):
@@ -247,6 +262,10 @@ def create_wait_window_pbe(root, wait_window_text, cancel_callback):
 
     return wait_window
 
+def clear_output(tab: PBE_Tab):
+    set_disabled_window_text(tab.output_text, "")
+    tab.verify_program_button.config(state='disabled')  # Disable the button
+
 # Function to handle the button press
 def process_pbe_program_input():
 
@@ -260,6 +279,7 @@ def process_pbe_program_input():
         loop_unrolling_limit = int(pbe.loop_unrolling_entry.get())  # Try to convert to integer
     except Exception:
         set_disabled_window_text_flash(pbe.message_text, "Error: Loop unrolling limit must be an integer.", True)
+        clear_output(pbe)
         return 
 
     program_text = pbe.program_input.get("1.0", tk.END).strip()  # Get text from input area
@@ -267,6 +287,7 @@ def process_pbe_program_input():
     # Check if the loop unrolling limit is less than 0
     if loop_unrolling_limit < 0:
         set_disabled_window_text_flash(pbe.message_text, "Error: Loop unrolling limit must be greater than or equal to 0.", True)
+        clear_output(pbe)
         return
 
     # Check if the program is valid
@@ -274,7 +295,8 @@ def process_pbe_program_input():
     try:
         ast = parse(program_text)
         if ast is None:
-            set_disabled_window_text_flash(pbe.message_text, "Error: Invalid program. Please enter a valid program.", True)
+            set_disabled_window_text_flash(pbe.message_text, "Error: The given program can't be parsed", True)
+            clear_output(pbe)
             return
     
         parameters = list(getPvars(ast))
@@ -282,15 +304,19 @@ def process_pbe_program_input():
 
         if(pbe.parameters != [] and parameters != pbe.parameters):
             set_disabled_window_text_flash(pbe.message_text, "Error: The program has different parameters than the examples. Please set examples and then synthesize", True)
+            clear_output(pbe)
             return
     except Exception as e:
         set_disabled_window_text_flash(pbe.message_text, f"Error: unexpected error: {e}", True)
+        clear_output(pbe)
         return 
+
+    # run_synthesis_pbe_no_process(program_text, loop_unrolling_limit, pbe.inputs_examples_synth_format, pbe.outputs_examples_synth_format, None, pbe.Q_str, pbe.linv_str)
 
     queue = multiprocessing.Queue()
     print(pbe.inputs_examples_synth_format)
     print(pbe.outputs_examples_synth_format)
-    process_pbe = multiprocessing.Process(target = run_synthesis_pbe, args=(program_text, queue, loop_unrolling_limit, pbe.inputs_examples_synth_format, pbe.outputs_examples_synth_format, pbe.P_str, pbe.Q_str, pbe.linv_str))
+    process_pbe = multiprocessing.Process(target = run_synthesis_pbe, args=(program_text, queue, loop_unrolling_limit, pbe.inputs_examples_synth_format, pbe.outputs_examples_synth_format, None, pbe.Q_str, pbe.linv_str))
     process_pbe.start()
 
     # Create a wait window which will be destroyed after the synthesis is done. Also pass it a callback function to cancel the synthesis
@@ -318,22 +344,32 @@ def process_pbe_program_input():
                 synth_result = queue.get()
                 final_output = ""
                 error = ""
-                if isinstance(synth_result, Exception):
+                if isinstance(synth_result, Synthesizer.ProgramNotVerified):
+                    error = "Error: The program can't be verified for the given input-output examples. If this is not the excpected outcome:\n"
+                    error += "1. Try increasing the loop unrolling limit.\n"
+                    error += "2. Check if the loop invariant is correct.\n"
+                    error += "3. Check if the post-condition is correct.\n"
+                    error += "4. Check that the examples do not contradict each other."
+                elif isinstance(synth_result, Synthesizer.ProgramNotValid):
+                    error = "Error: The given program can't be parsed"
+                elif isinstance(synth_result, Synthesizer.ProgramHasNoHoles):
+                    error = "Message: Program has no holes. You can try to verify your program."
+                    final_output = program_text
+                elif isinstance(synth_result, Exception):
                     error = f"An unexpected error occurred: {synth_result}"
-                elif synth_result == "":
-                    error = f"Synthesizing failed."
                 else:
                     print("Synthesis result:", synth_result)
                     final_output = synth_result
 
                 if(error != ""):
                     set_disabled_window_text_flash(pbe.message_text, error, True)
-                    # pbe.verify_program_button.config(state='disabled')  # Disable the button
-                    set_disabled_window_text(pbe.output_text, "")
+                    pbe.verify_program_button.config(state='disabled')  # Disable the button
+                    clear_output(pbe)
 
                 if(final_output != ""):
-                    set_disabled_window_text_flash(pbe.message_text, "The program has been synthesized successfully", False)
+                    if(error == ""):
+                        set_disabled_window_text_flash(pbe.message_text, "The program has been synthesized successfully", False)
                     set_disabled_window_text(pbe.output_text, final_output)
-                    # pbe.verify_program_button.config(state='normal')  # Enable the button
+                    pbe.verify_program_button.config(state='normal')  # Enable the button
 
     check_process()

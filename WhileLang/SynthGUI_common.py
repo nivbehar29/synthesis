@@ -1,12 +1,151 @@
 import tkinter as tk
 from tkinter import Toplevel
 from z3 import ForAll, Implies, Not, And, Or
+import os
+from contextlib import redirect_stdout
+from wp import verify
+from syntax.while_lang import parse
 
 # ------------------------------
-# Wait Window
+# ToolTip Class
 # ------------------------------
 
+# Function to create a tooltip
+class CreateToolTip(object):
+    def __init__(self, widget, text):
+        self.widget = widget
+        self.text = text
+        self.tooltip_window = None
+        widget.bind("<Enter>", self.show_tooltip)
+        widget.bind("<Leave>", self.hide_tooltip)
 
+    def show_tooltip(self, event=None):
+        x = y = 0
+        x, y, _, _ = self.widget.bbox("insert")
+        x += self.widget.winfo_rootx() + 25
+        y += self.widget.winfo_rooty() + 25
+        self.tooltip_window = tw = tk.Toplevel(self.widget)
+        tw.wm_overrideredirect(True)  # Remove window decorations
+        tw.wm_geometry(f"+{x}+{y}")
+        label = tk.Label(tw, text=self.text, background="yellow", relief="solid", borderwidth=1, justify='left')
+        label.pack()
+
+    def hide_tooltip(self, event=None):
+        if self.tooltip_window:
+            self.tooltip_window.destroy()
+        self.tooltip_window = None
+
+# ------------------------------
+# Wait Window For Output Program Verification
+# ------------------------------
+
+def verify_program(program_text, P, Q, linv, debug=False):
+    if not debug:
+        with open(os.devnull, 'w') as f:
+            with redirect_stdout(f):
+                ast = parse(program_text)
+                is_verified, solver = verify(P, ast, Q, linv)
+    else:
+        ast = parse(program_text)
+        is_verified, solver = verify(P, ast, Q, linv)
+
+    counter_ex = ""
+    if is_verified != True:
+        counter_ex = solver.model()
+
+    return is_verified, counter_ex
+
+def run_verifier(program_text, queue, P_str = None, Q_str = None, linv_str = None):
+    try:
+        P, Q, linv = eval_conditions(P_str, Q_str, linv_str)
+        is_verified, counter_ex = verify_program(program_text, P, Q, linv, True)
+
+        if is_verified:
+            queue.put(">> The program is verified.")
+        else:
+            queue.put(">> The program is NOT verified.\nCounterexample: " + str(counter_ex))
+
+    except Exception as e:
+        queue.put(e)
+
+import multiprocessing
+
+# Function to cancel a process running in the background
+def cancel_process(wait_window, process, tab):
+
+    if process and process.is_alive():
+        print("Cancelling the process...")
+        process.terminate()  # Terminate the child process
+        process.join()  # Wait for it to finish
+        print("Process terminated.")
+    
+    wait_window.destroy()  # Close the wait window
+    tab.verification_cancelled = True
+
+# Function to create the "Please Wait" window
+def create_wait_window(root, wait_window_text, cancel_callback, process, tab):
+    # Show the "Please Wait" window
+    wait_window = tk.Toplevel(root)
+    wait_window.title("Please Wait")
+    wait_window.geometry("300x100")
+    wait_label = tk.Label(wait_window, text=wait_window_text, font=("Helvetica", 12))
+    wait_label.pack(pady=20)
+
+    cancel_button = tk.Button(wait_window, text="Cancel", command = lambda: cancel_callback(wait_window, process, tab))
+    cancel_button.pack(pady=10)
+
+    return wait_window
+
+def verify_output_program(tab):
+    tab.message_text.config(state='normal')  # Make output editable
+    tab.message_text.delete('1.0', tk.END)  # Clear previous output
+
+    program_text = tab.output_text.get("1.0", tk.END).strip()  # Get text from output area
+
+    queue = multiprocessing.Queue()
+    process = multiprocessing.Process(target = run_verifier, args=(program_text, queue, tab.P_str, tab.Q_str, tab.linv_str))
+    process.start()
+
+    # Create a wait window which will be destroyed after the synthesis is done. Also pass it a callback function to cancel the synthesis
+    wait_window = create_wait_window(tab.root, "Please wait while synthesizing...", cancel_process, process, tab)
+
+    # Prevent pressing the main window while the wait window is open
+    wait_window.grab_set()
+
+    # Function to check the process status, waiting for it to finish and then display the result
+    def check_process():
+
+        if process.is_alive():
+            # Schedule the next check after 100 ms
+            tab.root.after(100, check_process)
+        else:
+            print("check_process: process has finished.")
+            # Code here will execute only after the process has finished
+
+            if tab.verification_cancelled == True:
+                tab.verification_cancelled = False
+                set_disabled_window_text_flash(tab.message_text, "Error: Verification process has been canceled.", True)
+                return
+
+            # Close the wait window and display the result
+            wait_window.destroy()
+
+            if not queue.empty():
+
+                # Get the result from the queue
+                verifier_result = queue.get()
+                final_output = ""
+                error = False
+                if isinstance(verifier_result, Exception):
+                    final_output = f"An unexpected error occurred: {verifier_result}"
+                    error = True
+                else:
+                    print("Verifier result:", verifier_result)
+                    final_output = verifier_result
+
+                set_disabled_window_text_flash(tab.message_text, final_output, error)
+
+    check_process()
 
 # ------------------------------
 # Conditions Window

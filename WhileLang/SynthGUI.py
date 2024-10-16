@@ -104,19 +104,28 @@ def create_pbe_tab():
     # Add a button to set conditions for PBE
     add_condition_button = tk.Button(pbe_frame, text="Set Conditions (P, Q, Linv)", command = lambda : open_conditions_window(pbe))
     add_condition_button.pack(pady=5)
-
-    # Add a button to trigger synthesis in the PBE mode
-    synthesize_button = tk.Button(pbe_frame, text="Synthesize with PBE", command=lambda : process_pbe_program_input())
-    synthesize_button.pack(pady=20)
+    # Add a tooltip with a description for the button
+    toolTip = (
+        "Click to open a window where you can set P, Q, and Loop Invariant (Linv) conditions.\n"
+        "Note: for PBE, P will be used only for verification of the output program."
+    )
+    CreateToolTip(add_condition_button, toolTip)
 
     # Add a Button to open the examples window
     open_window_button = tk.Button(pbe_frame, text="Set Examples", command=lambda: set_examples_routine(pbe))
     open_window_button.pack(pady=10)
 
-    return add_condition_button
+    # Add a button to trigger synthesis in the PBE mode
+    synthesize_button = tk.Button(pbe_frame, text="Synthesize with PBE", command=lambda : process_pbe_program_input())
+    synthesize_button.pack(pady=10)
+
+    verify_program_button = tk.Button(pbe_frame, text="Verify output Program", state='disabled', command = lambda : verify_output_program(pbe))
+    verify_program_button.pack(pady=10)
+
+    return add_condition_button, verify_program_button
 
 # Create buttons below the output window
-add_condition_button_pbe = create_pbe_tab()
+add_condition_button_pbe, verify_program_button_pbe = create_pbe_tab()
 
 # Placeholder for future PBE specific functionalities
 
@@ -138,6 +147,11 @@ def create_cegis_tab():
     # Add a button to set conditions for CEGIS
     add_condition_button = tk.Button(assertion_frame, text="Set Conditions (P, Q, Linv)", command = lambda : open_conditions_window(cegis))
     add_condition_button.pack(pady=5)
+    # Add a tooltip with a description for the button
+    toolTip = (
+        "Click to open a window where you can set P, Q, and Loop Invariant (Linv) conditions"
+    )
+    CreateToolTip(add_condition_button, toolTip)
 
     # Add a button to trigger synthesis in the assertion mode
     synthesize_button = tk.Button(assertion_frame, text="Synthesize with Assertion", command=process_assertion_program_input)
@@ -149,20 +163,21 @@ def create_cegis_tab():
     return add_condition_button, verify_program_button
 
 # Create buttons below the output window
-add_condition_button_assert, verify_program_button = create_cegis_tab()
+add_condition_button_cegis, verify_program_button_cegis = create_cegis_tab()
 
 # Start the main GUI loop
 if __name__ == "__main__":
     
     cegis.root = root
     cegis.message_text = message_text
-    cegis.verify_program_button = verify_program_button
+    cegis.verify_program_button = verify_program_button_cegis
     cegis.output_text = output_text
     cegis.loop_unrolling_entry = loop_unrolling_entry
     cegis.program_input = program_input
 
     pbe.root = root
     pbe.message_text = message_text
+    pbe.verify_program_button = verify_program_button_pbe
     pbe.output_text = output_text
     pbe.loop_unrolling_entry = loop_unrolling_entry
     pbe.program_input = program_input

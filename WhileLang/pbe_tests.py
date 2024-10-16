@@ -126,67 +126,44 @@ def multiple_ios_case_3():
     assertion = output_program == expected_program
     return assert_with_color(assertion, output_program, expected_program)
 
-def no_inputs_case():
+def no_inputs_case_1():
     orig_program =     "c1 := ?? ; c2 := ?? ; c3 := ??"
-    expected_program = "c1 := 1 ; c2 := 2 ; c3 := 3"
+    expected_program = ""
 
-    inputs_examples = [[]]
+    inputs_examples = [[],
+                       []]
     
-    output_examples = [[("c1", 1), ("c2", 2), ("c3", 3)]]
+    output_examples = [[("c1", 1), ("c2", 2), ("c3", 3)], [("c1", 1), ("c2", 2), ("c3", 1)]]
 
     output_program = get_io_program(orig_program, inputs_examples, output_examples, disable_prints, -100, 100)
 
     assertion = output_program == expected_program
     return assert_with_color(assertion, output_program, expected_program)
 
-def bound_case_1():
-    orig_program =     "c1 := ?? ; x1 := c1"
+def no_inputs_case_2():
+    orig_program =     "c1 := ?? ; c2 := ?? ; if c1 = c2 then d := 1 else d := 0"
+    expected_program = "c1 := 1253212 ; c2 := 1253212 ; if c1 = c2 then d := 1 else d := 0"
+
+    inputs_examples = [[]]
+    
+    output_examples = [[("c2", 1253212), ("d", 1)]]
+
+    output_program = get_io_program(orig_program, inputs_examples, output_examples, disable_prints, -100, 100)
+
+    assertion = output_program == expected_program
+    return assert_with_color(assertion, output_program, expected_program)
+
+def no_inputs_case_3():
+    orig_program =     "c1 := ?? ; c2 := ?? ; if c1 = c2 then d := 1 else d := 0"
     expected_program = ""
 
-    inputs_examples = [[('x1', 1)]]
+    inputs_examples = [[],
+                       []]
     
-    output_examples = [[('x1', 1)]]
+    output_examples = [[("c2", 2), ("d", 1)],
+                       [("c2", 3), ("d", 1)]]
 
-    output_program = get_io_program(orig_program, inputs_examples, output_examples, disable_prints, 4, 10)
-
-    assertion = output_program == expected_program
-    return assert_with_color(assertion, output_program, expected_program)
-
-def bound_case_2():
-    orig_program =     "c1 := ?? ; x1 := c1"
-    expected_program = "c1 := 1 ; x1 := c1"
-
-    inputs_examples = [[('x1', 1)]]
-    
-    output_examples = [[('x1', 1)]]
-
-    output_program = get_io_program(orig_program, inputs_examples, output_examples, disable_prints, 1, 5)
-
-    assertion = output_program == expected_program
-    return assert_with_color(assertion, output_program, expected_program)
-
-def bound_case_3():
-    orig_program =     "c1 := ?? ; x1 := c1"
-    expected_program = "c1 := 10 ; x1 := c1"
-
-    inputs_examples = [[('x1', 1)]]
-    
-    output_examples = [[('x1', 10)]]
-
-    output_program = get_io_program(orig_program, inputs_examples, output_examples, disable_prints, 10, 10)
-
-    assertion = output_program == expected_program
-    return assert_with_color(assertion, output_program, expected_program)
-
-def bound_case_4():
-    orig_program =     "c1 := ?? ; x1 := c1"
-    expected_program = ""
-
-    inputs_examples = [[('x1', 1)]]
-    
-    output_examples = [[('x1', 10)]]
-
-    output_program = get_io_program(orig_program, inputs_examples, output_examples, disable_prints, 11, 20)
+    output_program = get_io_program(orig_program, inputs_examples, output_examples, disable_prints, -100, 100)
 
     assertion = output_program == expected_program
     return assert_with_color(assertion, output_program, expected_program)
@@ -209,6 +186,7 @@ def dont_care_case_1():
 def while_case_1():
     orig_program =     "while a != b do if a > b then a := a - b else b := b - a"
     expected_program = "while a != b do if a > b then a := a - b else b := b - a"
+
     linv = None
 
     inputs_examples = [[("a", 3), ("b", 6)]]
@@ -343,11 +321,9 @@ def pbe_tests():
     ]
 
     aux_cases = [
-        # no_inputs_case, # TODO : Fix this case
-        bound_case_1,
-        bound_case_2,
-        bound_case_3,
-        bound_case_4,
+        no_inputs_case_1,
+        no_inputs_case_2,
+        no_inputs_case_3
     ]
 
     dond_care_cases = [
@@ -367,7 +343,7 @@ def pbe_tests():
     test_cases = []
     test_cases += linear_cases
     test_cases += multiple_ios_cases
-    # test_cases += aux_cases
+    test_cases += aux_cases
     test_cases += dond_care_cases
     test_cases += while_cases
 

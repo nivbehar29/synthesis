@@ -12,6 +12,23 @@ import re
 import copy
 
 class Synthesizer:
+
+    class ProgramNotValid(Exception):
+        """Raised when a specific program is not valid."""
+        pass
+
+    class ProgramHasNoHoles(Exception):
+        """Raised when a specific program has no holes."""
+        pass
+    
+    class ProgramNotVerified(Exception):
+        """Raised when a specific program can't be verified."""
+        pass
+
+    class NoInputToSatisfyProgram(Exception):
+        """Raised when a specific program can't be verified."""
+        pass
+
     def __init__(self, program):
         self.orig_program = program
         self.ast_orig = parse(self.orig_program)
@@ -54,7 +71,7 @@ class Synthesizer:
         print("pvars: ", self.pvars)
 
         try:
-            if inputs != [] and outputs != []:
+            if inputs != [] or outputs != []:
 
                 new_example_in = ['_'] * len(self.pvars)
                 new_example_out = ['_'] * len(self.pvars)
@@ -91,11 +108,13 @@ class Synthesizer:
         P = []
         Q = []
         inputs_example_tuples = []
+        output_example_tuples = []
 
         for example_input, example_output in zip(inputs, outputs):
             p = lambda d: True
             q = lambda d: True
             inputs_tuples = []
+            output_tuples = []
 
             print("\nadding conditions to P:")
             for var, value in zip(pvars, example_input):
@@ -112,15 +131,17 @@ class Synthesizer:
                     prev_q = copy.deepcopy(q)
                     q = lambda d, q = prev_q, var = var, value = value: And(q(d), d[var] == value)
                     print(f"var = {var}, value = {value}")
+                    output_tuples.append((var, value))
 
             inputs_example_tuples.append(inputs_tuples)
+            output_example_tuples.append(output_tuples)
 
             print("\n")
 
             P.append(p)
             Q.append(q)
 
-        return P, Q, inputs_example_tuples
+        return P, Q, inputs_example_tuples, output_example_tuples
 
     def fill_holes(self, program, sol):
         """Fills the holes in the program with the values from the solver model."""
@@ -167,7 +188,7 @@ class Synthesizer:
         non_holes_dict = {k: v for k, v in dict.items() if not hole_pattern.match(k)}
         return non_holes_dict
 
-    def synth_IO_program(self, orig_program, inputs, outputs, lower_bound = -100, upper_bound = 100, P = None, Q = None, linv = None, unroll_limit = 8):
+    def synth_IO_program(self, orig_program, inputs, outputs, lower_bound = -100, upper_bound = 100, P = None, Q = None, linv = None, unroll_limit = 8, raise_errors = False):
         """Synthesizes a program using input-output examples."""
         
         if P is None:
@@ -181,12 +202,15 @@ class Synthesizer:
 
         if(self.ast_orig is None):
             print("Error: Invalid program")
+            if(raise_errors):
+                raise self.ProgramNotValid("The given program can't be parsed")
             return ""
 
         pvars = sorted(list(getPvars(ast_orig)))
         print("Pvars: ", pvars)
 
-        _, Q_final, examples_inputs_tuples = self.generate_conditions(inputs, outputs, pvars)
+        print("generating conditions")
+        _, Q_final, examples_inputs_tuples, output_example_tuples = self.generate_conditions(inputs, outputs, pvars)
 
         for i in range(len(Q_final)):
             prev_Q_i = copy.deepcopy(Q_final[i])
@@ -194,10 +218,17 @@ class Synthesizer:
             Q_final[i] = lambda d, q_cond = prev_Q_i, q = Q_add: And(q(d), q_cond(d))
 
         holes_program, holes = self.process_holes(orig_program) # Replace all occurrences of '??' with unique hole variables, returnes program with holes vars, and holes vars list
+        
+        if(raise_errors and holes == []):
+            print("Error: The given program has no holes in it")
+            raise self.ProgramHasNoHoles("The given program has no holes in it")
+        
         print("Holes:", holes)
         ast_holes_unrolled = parse_and_unroll(holes_program, unroll_limit)
         if(ast_holes_unrolled is None):
             print("Error: Invalid program")
+            if(raise_errors):
+                raise self.ProgramNotValid("The given program can't be parsed")
             return ""
         
         program_holes_unrolled = tree_to_program(ast_holes_unrolled)
@@ -208,21 +239,31 @@ class Synthesizer:
 
         wp = WP(ast_holes_unrolled)
 
+        print("inputs: ", inputs)
+        print("outputs: ", outputs)
+
         for i in range(len(inputs)):            
             
+            P_i = copy.deepcopy(P)
+
+
             inputs_code = ""
             for input in examples_inputs_tuples[i]:
                 print("add input key:", input[0], ":=", input[1])
                 inputs_code += f"{input[0]} := {input[1]} ; "
 
-            holes_program_with_inputs = inputs_code + program_holes_unrolled
+            outputs_code = ""
+            # for output in output_example_tuples[i]:
+            #     print("add output key:", output[0], ":=", output[1])
+            #     outputs_code += f"; assert {output[0]} = {output[1]} "
+
+
+            holes_program_with_inputs = inputs_code + program_holes_unrolled + outputs_code
             print("holes_program_with_inputs: \n", holes_program_with_inputs)
             ast_holes_inputs = parse(holes_program_with_inputs)
 
             # wp = WP(ast_holes_inputs)
             wp_stmt = wp.wp(ast_holes_inputs, Q_final[i], linv)
-
-            P_i = copy.deepcopy(P)
 
             VC_i = Implies(P_i(wp.env), wp_stmt(wp.env))
             VC.append(VC_i)
@@ -240,145 +281,9 @@ class Synthesizer:
             return filled_program
         else:
             print(">> The program is NOT verified.")
+            if(raise_errors):
+                raise self.ProgramNotVerified("The given program can't be verified for the given input-output examples")
             return ""
-
-    def synth_IO_program_old(self, orig_program, inputs, outputs, lower_bound = -100, upper_bound = 100, linv = None, unroll_limit = 8):
-        """Synthesizes a program using input-output examples."""
-        ast_orig = parse(orig_program)
-
-        if(self.ast_orig is None):
-            print("Error: Invalid program")
-            return ""
-
-        pvars = sorted(list(getPvars(ast_orig)))
-        print("Pvars: ", pvars)
-
-        P, Q = self.generate_conditions(inputs, outputs, pvars)
-
-        if linv is None:
-            linv = lambda d: True
-        holes_program, holes = self.process_holes(orig_program) # Replace all occurrences of '??' with unique hole variables, returnes program with holes vars, and holes vars list
-        print("Holes:", holes)
-        ast_holes_unrolled = parse_and_unroll(holes_program, unroll_limit)
-        if(ast_holes_unrolled is None):
-            print("Error: Invalid program")
-            return ""
-        # print(ast)
-
-        pvars_holes = set(n for n in ast_holes_unrolled.terminals if isinstance(n, str) and n != 'skip')
-        print("Pvars with holes variables:", pvars_holes)
-        # env = mk_env(pvars_holes)
-
-
-        P_holes = copy.deepcopy(P)
-        Q_holes = copy.deepcopy(Q)
-
-        # this is to bound the limits of the holes - maybe we will need this for complicated programs
-        bound_conditions = [lambda d: True] * len(P_holes)
-        if(lower_bound != None and upper_bound != None):
-            for i in range(len(holes)):
-                for j in range(len(outputs)):
-                    prev_q = copy.deepcopy(bound_conditions[j])
-                    bound_conditions[j] = lambda d, hole_key=holes[i], q=prev_q: And(q(d), And(d[hole_key] <= upper_bound, d[hole_key] >= lower_bound))
-
-        for j in range(len(outputs)):            
-            orig_p = copy.deepcopy(P[j])
-            P_holes[j] = lambda d, p = orig_p, bc = bound_conditions[j]: And(bc(d), p(d))
-
-
-        holes_conditions = lambda d: False
-
-
-        i = 0
-        while (i < len(inputs)):
-            print("\n*******************************************\n")
-            print("i = ", i)
-            # print("ast_holes: \n", ast_holes_unrolled)
-            # print("program unrolled: \n", tree_to_program(ast_holes_unrolled))
-
-            wp = WP(ast_holes_unrolled)
-            wp_stmt = wp.wp(ast_holes_unrolled, Q_holes[i], linv)
-
-            formula = And(P_holes[i](wp.env), wp_stmt(wp.env))
-
-            # prev_q = copy.deepcopy(Q_holes[i])
-            # print("Q_holes[i]: ", Q_holes[i])
-            # new_q = lambda d: And(d['a'] > 0, d['a'] == d['b'])
-            # Q_holes[i] = lambda d, q = prev_q, new_qq = new_q: And(q(d), new_qq(d))
-
-            # Q = Q_holes[i] # new_q
-
-            # return verify(P_holes[i], ast_holes, Q_holes[i], linv)
-            # return ""
-
-            solver = Solver()
-            solver.add(formula)
-            if solver.check() == unsat:
-                print(">> The program is verified with IO example ", i)
-
-                i += 1
-                continue  # Continue with the next input
-
-            # Get the model and fill the holes in the program
-            model = solver.model()
-            print("model: ", model)
-            filled_program = self.fill_holes(holes_program, solver)
-            print("filled program:")
-            print(filled_program) 
-
-            # check if all verified
-            solver_for_counterexample = None
-            is_valid_for_all_ios = True
-            for j in range(len(inputs)):
-                is_verified, solver_for_counterexample = verify(P[j], parse_and_unroll(filled_program, unroll_limit), Q[j], linv = linv)
-                if(is_verified):
-                    continue
-                else:
-                    is_valid_for_all_ios = False
-                    break
-
-            print()
-
-            if(is_valid_for_all_ios):
-                print("The program is verified for all IO examples")
-                final_program = self.fill_holes(holes_program, solver)
-                final_program, _ = self.fill_holes_with_zeros(final_program, holes)
-                return final_program
-            else:
-                print("The program is not verified for all IO examples")
-                # counterexample_dict = extract_model_assignments(solver)
-                # print("counter example dict:", counterexample_dict)
-
-                holes_dict = self.extract_holes_from_dict(extract_model_assignments(solver))
-                counterexample_dict = {}
-                if(solver_for_counterexample != None):
-                    counterexample_dict = self.extract_holes_from_dict(extract_model_assignments(solver_for_counterexample))
-                    print("counter example dict:", counterexample_dict)
-                    holes_dict.update(counterexample_dict)
-                # counterexample_dict = extract_model_assignments(solver)
-                print("holes to set as not valid:", holes_dict)
-
-                for j in range(len(inputs)):
-                    addition_holes_condition = lambda d: True
-                    for hole_key, hole_value in holes_dict.items():
-                        prev_addition_holes_conditions = addition_holes_condition
-                        addition_holes_condition = lambda d, q = prev_addition_holes_conditions, var = hole_key, value = hole_value: And(q(d), d[var] == value)
-
-                    prev_holes_conditions = copy.deepcopy(holes_conditions)
-                    holes_conditions = lambda d, q = prev_holes_conditions, q2 = addition_holes_condition: Or(q(d), q2(d))
-
-                    # prev_q = Q_holes[j]
-                    orig_q = copy.deepcopy(Q[j])
-                    # Q_holes[j] = lambda d, q=orig_q: And(q(d), Not(holes_conditions(d)))
-                    # Q_holes[j] = lambda d, q = orig_q, bc = bound_conditions[j]: And(bc(d), And(q(d), Not(holes_conditions(d))))
-                    Q_holes[j] = lambda d, q = orig_q: And(q(d), Not(holes_conditions(d)))
-
-                    
-
-                # start again from IO number 0
-                i = 0
-
-        return ""
     
     def find_holes(self, ast, P, Q, linv):
         wp = WP(ast)
@@ -407,22 +312,6 @@ class Synthesizer:
         else:
             for child in ast.subtrees:
                 self.fill_ast_holes(child, holes)
-
-    class ProgramNotValid(Exception):
-        """Raised when a specific program is not valid."""
-        pass
-
-    class ProgramHasNoHoles(Exception):
-        """Raised when a specific program has no holes."""
-        pass
-    
-    class ProgramNotVerified(Exception):
-        """Raised when a specific program can't be verified."""
-        pass
-
-    class NoInputToSatisfyProgram(Exception):
-        """Raised when a specific program can't be verified."""
-        pass
 
     def synth_program(self, orig_program, P, Q, linv = None, lower_bound = -100, upper_bound = 100, unroll_limit = 10):
 
@@ -456,8 +345,9 @@ class Synthesizer:
 
         holes_program, holes = self.process_holes(orig_program) # Replace all occurrences of '??' with unique hole variables, returnes program with holes vars, and holes vars list
 
+        print("holessss: ", holes)
+
         if(holes == []):
-            print("No holes found in the program. trying to verify the program")
             raise self.ProgramHasNoHoles("The given program has no holes in it")
             # is_verified, _ = verify(P, ast_orig, Q, linv=linv)
             # if(is_verified == False):
