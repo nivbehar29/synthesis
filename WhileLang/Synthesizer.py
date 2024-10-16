@@ -167,8 +167,16 @@ class Synthesizer:
         non_holes_dict = {k: v for k, v in dict.items() if not hole_pattern.match(k)}
         return non_holes_dict
 
-    def synth_IO_program(self, orig_program, inputs, outputs, lower_bound = -100, upper_bound = 100, linv = None, unroll_limit = 8):
+    def synth_IO_program(self, orig_program, inputs, outputs, lower_bound = -100, upper_bound = 100, P = None, Q = None, linv = None, unroll_limit = 8):
         """Synthesizes a program using input-output examples."""
+        
+        if P is None:
+            P = lambda d: True
+        if Q is None:
+            Q = lambda d: True
+        if linv is None:
+            linv = lambda d: True
+
         ast_orig = parse(orig_program)
 
         if(self.ast_orig is None):
@@ -178,10 +186,12 @@ class Synthesizer:
         pvars = sorted(list(getPvars(ast_orig)))
         print("Pvars: ", pvars)
 
-        P, Q, examples_inputs_tuples = self.generate_conditions(inputs, outputs, pvars)
+        _, Q_final, examples_inputs_tuples = self.generate_conditions(inputs, outputs, pvars)
 
-        if linv is None:
-            linv = lambda d: True
+        for i in range(len(Q_final)):
+            prev_Q_i = copy.deepcopy(Q_final[i])
+            Q_add = copy.deepcopy(Q)
+            Q_final[i] = lambda d, q_cond = prev_Q_i, q = Q_add: And(q(d), q_cond(d))
 
         holes_program, holes = self.process_holes(orig_program) # Replace all occurrences of '??' with unique hole variables, returnes program with holes vars, and holes vars list
         print("Holes:", holes)
@@ -210,15 +220,15 @@ class Synthesizer:
             ast_holes_inputs = parse(holes_program_with_inputs)
 
             # wp = WP(ast_holes_inputs)
-            wp_stmt = wp.wp(ast_holes_inputs, Q[i], linv)
+            wp_stmt = wp.wp(ast_holes_inputs, Q_final[i], linv)
 
-            P_i = lambda d: True
+            P_i = copy.deepcopy(P)
 
             VC_i = Implies(P_i(wp.env), wp_stmt(wp.env))
             VC.append(VC_i)
 
-        VC = And(VC)
-        solver.add(VC)
+        VC_final = And(VC)
+        solver.add(VC_final)
         
         if solver.check() == sat:
             print(">> The program is verified.")
