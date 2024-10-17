@@ -50,6 +50,9 @@ class Synthesizer:
         self.inputs = []  # List of input examples
         self.outputs = []   # List of output examples
 
+        # Interactive CEGIS variables
+        self.abort_flag = [False]
+
     def process_holes(self, orig_program):
         """Replaces all occurrences of '??' in the program string with unique hole variables."""
         holes_program = copy.deepcopy(orig_program)
@@ -437,13 +440,137 @@ class Synthesizer:
         # if solver_valid != None:
         #     del solver_valid
         
-        return holes, holes_program, program_holes_unrolled
+        return holes, holes_program, program_holes_unrolled, P, Q, linv
     
+    def cegis_interactive(self, orig_program, P, Q, linv = None, unroll_limit = 10):
+        self.abort_flag = [False]
+
+        holes, holes_program, program_holes_unrolled, P, Q, linv = self.cegis_init_checks(orig_program, P, Q, linv, unroll_limit)
+
+        yield ("state_0", "Wait for initialization")
+
+
+        yield ("state_1", "Replace holes with variables", program_holes_unrolled)
+
+        # First, we fill the program holes with zeros
+        filled_program, filled_holes_dict = self.fill_holes_with_zeros(program_holes_unrolled, holes)
+
+
+        yield ("state_2", "Fill holes with zeroes", filled_program)
+
+
+        # Initialize the final holes predicate
+        final_holes_p = lambda d: True
+
+        # Initialize holes dictionary
+        new_holes_dict = {}
+
+        # initialize iteration counter
+        k = 0
+        while(True):
+            k += 1
+            print("\n*******************************************\n")
+            ast_filled = parse(filled_program)
+            result, solver = verify(P, ast_filled, Q, linv=linv)
+
+            yield ("state_3", "Try to verify the program", result, solver)
+
+            if result == True:
+                print("The program is verified")
+                filled_program_final = self.fill_holes_dict(holes_program, new_holes_dict)
+                holes_to_fill_with_zeroes = [key for key in holes if key not in new_holes_dict.keys()]
+                print("holes to fill with zeroes:", holes_to_fill_with_zeroes)
+                filled_program_final, _ = self.fill_holes_with_zeros(filled_program_final, holes_to_fill_with_zeroes)
+                print(f"final filled program: {filled_program_final}")
+                print("num of iterations:", k)
+
+                yield ("state_3_1", "Verification succeeded, fill program with current holes", filled_program_final)
+
+                return filled_program_final          
+            
+            ce = self.extract_counter_example_from_dict(extract_model_assignments(solver))
+            if ce == {}:
+                print("No counter example found - each input is a counter example")
+                # ce = {'x': 0}
+
+            yield ("state_3_2", "Verification failed, show counter example", ce)
+
+            print("counter example dict:", ce)
+
+            del solver
+
+            # This is dumb - Z3 has a bug when it gives a counter example with inputs which are not equal to inputs we assign in P
+            # Or am I dumb? - I need to check this
+            # For the time being, I will assign the inputs manually to the beginning of the program
+            # inputs_p = lambda d: True
+            # for input_key in ce:
+            #     print("add input key:", input_key, "=", ce[input_key])
+            #     input_p = lambda d: d[input_key] == ce[input_key]
+            #     prev_inputs_p = copy.deepcopy(inputs_p)
+            #     inputs_p = lambda d, p = prev_inputs_p, q = input_p: And(p(d), q(d))
+
+            inputs_code = ""
+            for input_key in ce:
+                print("add input key:", input_key, ":=", ce[input_key])
+                inputs_code += f"{input_key} := {ce[input_key]} ; "
+
+            holes_program_with_inputs = inputs_code + program_holes_unrolled
+            ast_holes_inputs = parse(holes_program_with_inputs)
+
+            holes_p = lambda d: True
+            for hole_key in filled_holes_dict:
+                print("excluded hole key:", hole_key, "!=", filled_holes_dict[hole_key])
+                hole_p = lambda d: d[hole_key] != filled_holes_dict[hole_key]
+                prev_holes_p = copy.deepcopy(holes_p)
+                holes_p = lambda d, p = prev_holes_p, q = hole_p: And(p(d), q(d))
+
+            prev_final_holes_p = copy.deepcopy(final_holes_p)
+            final_holes_p = lambda d, p = prev_final_holes_p, q = holes_p: And(p(d), q(d))
+
+            # final_P = lambda d, p = P, q = inputs_p, h = final_holes_p: And(p(d), h(d), q(d))
+            final_P = lambda d, p = P, h = final_holes_p: And(p(d), h(d))
+
+            print("Finding holes")
+            result, solver = self.find_holes(ast_holes_inputs, final_P, Q, linv=linv)
+            if result == False:
+                print("num of iterations:", k)
+                raise self.ProgramNotVerified("The given program can't be verified for all possible inputs")
+            else:
+                print("holes:", solver.model())
+            
+            new_holes_dict = self.extract_holes_from_dict(extract_model_assignments(solver))
+            print("new holes dict:", new_holes_dict)
+
+            if new_holes_dict == {}:
+                print("No new holes found")
+                print("num of iterations:", k)
+                return ""
+            
+            del solver
+            
+            filled_program = self.fill_holes_dict(program_holes_unrolled, new_holes_dict)
+            holes_to_fill_with_zeroes = [key for key in holes if key not in new_holes_dict.keys()]
+            print("holes to fill with zeroes:", holes_to_fill_with_zeroes)
+            filled_program, holes_filled_with_zeroes_dict = self.fill_holes_with_zeros(filled_program, holes_to_fill_with_zeroes)
+            print("new_holes_dict:", new_holes_dict)
+            print("holes_filled_with_zeroes_dict:", holes_filled_with_zeroes_dict)
+            filled_holes_dict = new_holes_dict
+            filled_holes_dict.update(holes_filled_with_zeroes_dict)
+            print("filled_holes_dict:", filled_holes_dict)
+            print("new filled program:")
+            print(filled_program)
+
+
+
+        yield "cegis_interactive: 3rd yield"
+
+        # raise StopIteration("cegis_interactive finished")
+
     def synth_program(self, orig_program, P, Q, linv = None, unroll_limit = 10):
 
         # Checks if the given program can be parsed, have holes, and variables names are valid
         # Also returns the holes, holes program, and program with holes unrolled  
-        holes, holes_program, program_holes_unrolled = self.cegis_init_checks(orig_program, P, Q, linv, unroll_limit)
+        holes, holes_program, program_holes_unrolled, P, Q, linv = self.cegis_init_checks(orig_program, P, Q, linv, unroll_limit)
 
         # First, we fill the program holes with zeros
         filled_program, filled_holes_dict = self.fill_holes_with_zeros(program_holes_unrolled, holes)
