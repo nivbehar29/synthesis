@@ -33,6 +33,10 @@ class Synthesizer:
         """Raised when a specific program can't be verified."""
         pass
 
+    class ProgramHasInvalidVarName(Exception):
+        """Raised when a specific program is not valid."""
+        pass
+
     def __init__(self, program):
         self.orig_program = program
         self.ast_orig = parse(self.orig_program)
@@ -192,6 +196,16 @@ class Synthesizer:
         non_holes_dict = {k: v for k, v in dict.items() if not hole_pattern.match(k)}
         return non_holes_dict
 
+    def check_for_hole(self, variables):
+        # Regular expression to match the pattern "hole_" followed by a number
+        pattern = r'hole_\d+'
+        
+        for var in variables:
+            if re.match(pattern, var):
+                return var
+        return None
+
+
     def synth_IO_program(self, orig_program, inputs, outputs, P = None, Q = None, linv = None, unroll_limit = 8, raise_errors = False):
         """Synthesizes a program using input-output examples."""
         
@@ -212,6 +226,13 @@ class Synthesizer:
 
         pvars = sorted(list(getPvars(ast_orig)))
         print("Pvars: ", pvars)
+
+        holes_vars_check = self.check_for_hole(pvars)
+        if holes_vars_check is not None:
+            print("Error: Invalid variable name: {holes_vars_check}")
+            if(raise_errors):
+                raise self.ProgramHasInvalidVarName(f"{holes_vars_check}")
+            return ""
 
         print("generating conditions")
         P_inputs, Q_outputs, examples_inputs_tuples, output_example_tuples = self.generate_conditions(inputs, outputs, pvars)
@@ -375,9 +396,13 @@ class Synthesizer:
             raise self.ProgramNotValid("The given program can't be parsed")
 
 
-
         pvars = sorted(list(getPvars(ast_orig)))
         print("Pvars: ", pvars)
+
+        holes_vars_check = self.check_for_hole(pvars)
+        if holes_vars_check is not None:
+            print("Error: Invalid variable name: {holes_vars_check}")
+            raise self.ProgramHasInvalidVarName(f"{holes_vars_check}")
 
         if linv is None:
             linv = lambda d: True
@@ -394,42 +419,30 @@ class Synthesizer:
 
         if(holes == []):
             raise self.ProgramHasNoHoles("The given program has no holes in it")
-            # is_verified, _ = verify(P, ast_orig, Q, linv=linv)
-            # if(is_verified == False):
-            #     raise self.ProgramNotVerified("The given program is not verified for all inputs")
-            # return orig_program
 
         ast_holes = parse(holes_program)
         if(ast_holes is None):
             raise self.ProgramNotValid("The given program can't be parsed")
-        
-        # print(holes_program)
-        # is_there_valid_input, _ = is_exist_input_to_satisfy(P, ast_holes, Q, linv=linv)
-        # if(is_there_valid_input == False):
-        #     raise self.NoInputToSatisfyProgram("The given program has no input which can satisfy the conditions")
         
         ast_holes_unrolled = parse_and_unroll(holes_program, unroll_limit)
         if(ast_holes_unrolled is None):
             raise self.ProgramNotValid("The given program can't be parsed")
         program_holes_unrolled = tree_to_program(ast_holes_unrolled)
         print(f"program_holes_unrolled: \n{program_holes_unrolled}\n")
-        
+
+        # Checks for the existence of an input that satisfies the conditions
+        print(holes_program)
+        is_there_valid_input, solver_valid = is_exist_input_to_satisfy(P, ast_holes_unrolled, Q, linv)
+        print("is_there_valid_input: ", is_there_valid_input)
+        if(is_there_valid_input == False):
+            raise self.NoInputToSatisfyProgram("The given program has no input which can satisfy the conditions")
 
         # filled_program, filled_holes_dict = self.fill_holes_with_zeros(holes_program, holes)
 
         # print("ast_unrolled_filled_with_zeros: ", ast_unrolled_filled_with_zeros)
         filled_program, filled_holes_dict = self.fill_holes_with_zeros(program_holes_unrolled, holes)
-        
-
-        # this is to bound the limits of the holes - maybe we will need this for complicated programs
-        bound_conditions = lambda d: True
-        # if(lower_bound != None and upper_bound != None):
-        #     for i in range(len(holes)):
-        #         prev_bound_conditions = copy.deepcopy(bound_conditions)
-        #         print("hole key:", holes[i], "bound:", lower_bound, upper_bound)
-        #         bound_conditions = lambda d, hole_key=holes[i], q=prev_bound_conditions: And(q(d), d[hole_key] <= upper_bound, d[hole_key] >= lower_bound)
            
-        final_holes_p = copy.deepcopy(bound_conditions)
+        final_holes_p = lambda d: True
 
         new_holes_dict = {}
 

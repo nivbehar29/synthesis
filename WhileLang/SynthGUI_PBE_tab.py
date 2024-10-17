@@ -223,7 +223,8 @@ def run_synthesis_pbe(program_text, queue, loop_unrolling_limit, inputs_examples
     try:
         returned_program = synth_program_pbe(program_text, P, Q, linv, inputs_examples, output_examples, True, loop_unrolling_limit)
         queue.put(returned_program)
-    except (Synthesizer.ProgramNotValid, Synthesizer.ProgramNotVerified, Synthesizer.ProgramHasNoHoles, Synthesizer.NoExamplesProvided) as e:
+    except (Synthesizer.ProgramNotValid, Synthesizer.ProgramNotVerified, Synthesizer.ProgramHasNoHoles, Synthesizer.NoExamplesProvided,
+            Synthesizer.ProgramHasInvalidVarName) as e:
         print("run_synthesis_cegis raised an exception:", e)
         queue.put(e)
     except Exception as e:
@@ -355,8 +356,10 @@ def process_pbe_program_input():
                 elif isinstance(synth_result, Synthesizer.ProgramHasNoHoles):
                     error = "Message: Program has no holes. You can try to verify your program."
                     final_output = program_text
+                elif isinstance(synth_result, Synthesizer.ProgramHasInvalidVarName):
+                    error = f"Error: Invalid variable name: {synth_result}.\nPlease use valid variable names which are not of the form 'hole_x', where x is a number."
                 elif isinstance(synth_result, Synthesizer.NoExamplesProvided):
-                    error = "Error: No input-output examples has been provided"
+                    error = "Error: No input-output examples has been provided. Please set examples and then synthesize."
                 elif isinstance(synth_result, Exception):
                     error = f"An unexpected error occurred: {synth_result}"
                 else:

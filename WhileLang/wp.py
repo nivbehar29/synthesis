@@ -1,6 +1,6 @@
 import typing
 import operator
-from z3 import Int, ForAll, Implies, Not, And, Solver, unsat, sat, Ast, Or
+from z3 import Int, ForAll, Implies, Not, And, Solver, unsat, sat, Ast, Or, Exists
 
 from syntax.tree import Tree
 from syntax.while_lang import parse

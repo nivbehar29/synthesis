@@ -153,18 +153,6 @@ def holes_basic_case_1():
 
     return test_synth_program(program, P, Q, linv, expected_program, expected_error, disable_prints)
 
-def holes_basic_case_1():
-    program = "c1 := ?? ; assert(c1 >= 2) ; c2 := ?? ; a := c1 * x ; b := c2 - 1 ; a := a + b; c := x + x ; assert(a = c)"
-
-    P = lambda d: True
-    Q = lambda d: True
-    linv = lambda d: True
-
-    expected_program = "c1 := 2 ; assert(c1 >= 2) ; c2 := 1 ; a := c1 * x ; b := c2 - 1 ; a := a + b; c := x + x ; assert(a = c)"
-    expected_error = NoErrorExcpected
-
-    return test_synth_program(program, P, Q, linv, expected_program, expected_error, disable_prints)
-
 def holes_basic_case_2():
     program = "c1 := ?? ; c2 := ?? ; a := c1 * x ; b := c2 - 1 ; a := a + b; c := x + x ; assert(a = c)"
 
@@ -255,12 +243,26 @@ def holes_no_sol_case_1():
     linv = lambda d: True
 
     expected_program = ""
-    expected_error = Synthesizer.ProgramNotVerified
+    expected_error = Synthesizer.NoInputToSatisfyProgram
 
     return test_synth_program(program, P, Q, linv, expected_program, expected_error, disable_prints)
 
 def holes_no_sol_case_2():
     program = "y := ?? ; if x < 6 then ( x := y + 4 ) else skip  ; assert x = 6"
+
+    P = lambda d: True
+    Q = lambda d: True
+    linv = lambda d: True
+
+    expected_program = ""
+    expected_error = Synthesizer.ProgramNotVerified
+
+    return test_synth_program(program, P, Q, linv, expected_program, expected_error, disable_prints)
+
+def holes_no_sol_case_3():
+    # brutal test which can't be solved by the current CEGIS algorithm.
+    # currently our algorithm run forever for this test.
+    program = "y:= x + ?? ; if y = 10 then x := 5 else x := 9 ; assert x = 9"
 
     P = lambda d: True
     Q = lambda d: True
@@ -407,6 +409,7 @@ def assert_tests():
     holes_no_sol_cases = [
         holes_no_sol_case_1,
         holes_no_sol_case_2,
+        # holes_no_sol_case_3,
     ]
 
     holes_while_cases = [

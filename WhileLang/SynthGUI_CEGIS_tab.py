@@ -55,7 +55,8 @@ def run_synthesis_cegis(program_text, queue, loop_unrolling_limit, P_str = None,
 
         print("Synthesis successful.")
         queue.put(returned_program)
-    except (Synthesizer.ProgramNotValid, Synthesizer.ProgramNotVerified, Synthesizer.ProgramHasNoHoles) as e:
+    except (Synthesizer.ProgramNotValid, Synthesizer.ProgramNotVerified, Synthesizer.ProgramHasNoHoles,
+            Synthesizer.ProgramHasInvalidVarName) as e:
         print("run_synthesis_cegis raised an exception:", e)
         queue.put(e)
     except Exception as e:
@@ -149,6 +150,8 @@ def process_assertion_program_input():
                     error += "1. Try increasing the loop unrolling limit.\n"
                     error += "2. Check if the loop invariant is correct.\n"
                     error += "3. Check if the pre-condition and post-condition are correct."
+                elif isinstance(synth_result, Synthesizer.ProgramHasInvalidVarName):
+                    error = f"Error: Invalid variable name: {synth_result}.\nPlease use valid variable names which are not of the form 'hole_x', where x is a number."    
                 elif isinstance(synth_result, Exception):
                     error = f"An unexpected error occurred: {synth_result}"
                 else:
