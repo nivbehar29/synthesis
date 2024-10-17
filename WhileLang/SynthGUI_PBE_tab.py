@@ -208,11 +208,11 @@ def synth_program_pbe(program, P, Q, linv, inputs_examples, output_examples, deb
             with redirect_stdout(f):
                 for ex_in, ex_out in zip(inputs_examples, output_examples):
                     synth.add_io_example(ex_in, ex_out)
-                returned_program = synth.synth_IO_program(program, synth.inputs, synth.outputs, -100, 100, P, Q, linv, unroll_limit, True)
+                returned_program = synth.synth_IO_program(program, synth.inputs, synth.outputs, P, Q, linv, unroll_limit, True)
     else:
         for ex_in, ex_out in zip(inputs_examples, output_examples):
             synth.add_io_example(ex_in, ex_out)
-        returned_program = synth.synth_IO_program(program, synth.inputs, synth.outputs, -100, 100, P, Q,  linv, unroll_limit, True)
+        returned_program = synth.synth_IO_program(program, synth.inputs, synth.outputs, P, Q,  linv, unroll_limit, True)
 
     return returned_program
 

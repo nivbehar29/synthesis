@@ -9,23 +9,23 @@ RESET = "\033[0m"
 
 disable_prints = True
 
-def synthesize_io_program(orig_program, inputs_examples, output_examples, lower_bound, upper_bound, P, Q, linv, unroll_limit = 8):
+def synthesize_io_program(orig_program, inputs_examples, output_examples, P, Q, linv, unroll_limit = 8):
     synth = Synthesizer(orig_program)
     for ex_in, ex_out in zip(inputs_examples, output_examples):
         synth.add_io_example(ex_in, ex_out)
-    return synth.synth_IO_program(synth.orig_program, synth.inputs, synth.outputs, lower_bound, upper_bound, P, Q, linv, unroll_limit)
+    return synth.synth_IO_program(synth.orig_program, synth.inputs, synth.outputs, P, Q, linv, unroll_limit)
 
-def get_io_program(orig_program, inputs_examples, output_examples, to_disable_print, lower_bound, upper_bound, P = None, Q = None, linv = None, unroll_limit = 8):
+def get_io_program(orig_program, inputs_examples, output_examples, to_disable_print, P = None, Q = None, linv = None, unroll_limit = 8):
     
     output_program = None
 
     if to_disable_print:
         with open(os.devnull, 'w') as f:
             with redirect_stdout(f):
-                output_program = synthesize_io_program(orig_program, inputs_examples, output_examples, lower_bound, upper_bound, P, Q, linv, unroll_limit)
+                output_program = synthesize_io_program(orig_program, inputs_examples, output_examples, P, Q, linv, unroll_limit)
 
     else:
-        output_program = synthesize_io_program(orig_program, inputs_examples, output_examples, lower_bound, upper_bound, P, Q, linv, unroll_limit)
+        output_program = synthesize_io_program(orig_program, inputs_examples, output_examples, P, Q, linv, unroll_limit)
 
     return output_program
 
@@ -55,7 +55,7 @@ def linear_case_1():
     output_examples = [[("d", 1)],
                        [("d", 1)]]
 
-    output_program = get_io_program(orig_program, inputs_examples, output_examples, disable_prints, -4, 50)
+    output_program = get_io_program(orig_program, inputs_examples, output_examples, disable_prints)
     
 
     assertion = output_program == expected_program
@@ -72,7 +72,7 @@ def linear_case_2():
     output_examples = [[("d", 1)],
                        [("d", 1)]]
 
-    output_program = get_io_program(orig_program, inputs_examples, output_examples, disable_prints, -4, 50)
+    output_program = get_io_program(orig_program, inputs_examples, output_examples, disable_prints)
 
     assertion = output_program == expected_program
     return assert_with_color(assertion, output_program, expected_program)
@@ -87,7 +87,7 @@ def multiple_ios_case_1():
     output_examples = [[("c1", 4), ("c2", 8), ("c3", 12)],
                        [("c1", 8), ("c2", 16), ("c3", 24)]]
 
-    output_program = get_io_program(orig_program, inputs_examples, output_examples, disable_prints, -100, 100)
+    output_program = get_io_program(orig_program, inputs_examples, output_examples, disable_prints)
 
     assertion = output_program == expected_program
     return assert_with_color(assertion, output_program, expected_program)
@@ -104,7 +104,7 @@ def multiple_ios_case_2():
                        [("c1", 5), ("c2", 9), ("c3", 13)],
                        [("c1", 13), ("c2", 18), ("c3", 22)]]
 
-    output_program = get_io_program(orig_program, inputs_examples, output_examples, disable_prints, -100, 100)
+    output_program = get_io_program(orig_program, inputs_examples, output_examples, disable_prints)
 
     assertion = output_program == expected_program
     return assert_with_color(assertion, output_program, expected_program)
@@ -121,7 +121,7 @@ def multiple_ios_case_3():
                        [("c1", 5), ("c2", 9), ("c3", 13)],
                        [("c1", 7), ("c2", 11), ("c3", 15)]]
 
-    output_program = get_io_program(orig_program, inputs_examples, output_examples, disable_prints, -100, 100)
+    output_program = get_io_program(orig_program, inputs_examples, output_examples, disable_prints)
 
     assertion = output_program == expected_program
     return assert_with_color(assertion, output_program, expected_program)
@@ -135,7 +135,7 @@ def no_inputs_case_1():
     
     output_examples = [[("c1", 1), ("c2", 2), ("c3", 3)], [("c1", 1), ("c2", 2), ("c3", 1)]]
 
-    output_program = get_io_program(orig_program, inputs_examples, output_examples, disable_prints, -100, 100)
+    output_program = get_io_program(orig_program, inputs_examples, output_examples, disable_prints)
 
     assertion = output_program == expected_program
     return assert_with_color(assertion, output_program, expected_program)
@@ -148,7 +148,7 @@ def no_inputs_case_2():
     
     output_examples = [[("c2", 1253212), ("d", 1)]]
 
-    output_program = get_io_program(orig_program, inputs_examples, output_examples, disable_prints, -100, 100)
+    output_program = get_io_program(orig_program, inputs_examples, output_examples, disable_prints)
 
     assertion = output_program == expected_program
     return assert_with_color(assertion, output_program, expected_program)
@@ -163,7 +163,7 @@ def no_inputs_case_3():
     output_examples = [[("c2", 2), ("d", 1)],
                        [("c2", 3), ("d", 1)]]
 
-    output_program = get_io_program(orig_program, inputs_examples, output_examples, disable_prints, -100, 100)
+    output_program = get_io_program(orig_program, inputs_examples, output_examples, disable_prints)
 
     assertion = output_program == expected_program
     return assert_with_color(assertion, output_program, expected_program)
@@ -178,7 +178,7 @@ def dont_care_case_1():
     output_examples = [[("c2", 2), ("c3", 3)],
                        [("c2", 2), ("c3", 3)]]
 
-    output_program = get_io_program(orig_program, inputs_examples, output_examples, disable_prints, -100, 100)
+    output_program = get_io_program(orig_program, inputs_examples, output_examples, disable_prints)
 
     assertion = output_program == expected_program
     return assert_with_color(assertion, output_program, expected_program)
@@ -192,7 +192,7 @@ def while_case_1():
     inputs_examples = [[("a", 3), ("b", 6)]]
     output_examples = [[("a", 3), ("b", 3)]]
 
-    output_program = get_io_program(orig_program, inputs_examples, output_examples, disable_prints, -100, 100, None, None, linv)
+    output_program = get_io_program(orig_program, inputs_examples, output_examples, disable_prints, None, None, linv)
 
     assertion = output_program == expected_program
     return assert_with_color(assertion, output_program, expected_program)
@@ -207,7 +207,7 @@ def while_case_2():
 
     output_examples = [[("x", 8)]]
 
-    output_program = get_io_program(orig_program, inputs_examples, output_examples, disable_prints, -100, 100, None, None, linv, unroll_limit)
+    output_program = get_io_program(orig_program, inputs_examples, output_examples, disable_prints, None, None, linv, unroll_limit)
 
     assertion = output_program == expected_program
     return assert_with_color(assertion, output_program, expected_program)
@@ -226,7 +226,7 @@ def while_case_3():
                        [("x", 32)],
                        [("x", 64)]]
 
-    output_program = get_io_program(orig_program, inputs_examples, output_examples, disable_prints, 0, 10, None, None, linv, unroll_limit)
+    output_program = get_io_program(orig_program, inputs_examples, output_examples, disable_prints, None, None, linv, unroll_limit)
 
     assertion = output_program == expected_program
     return assert_with_color(assertion, output_program, expected_program)
@@ -243,7 +243,7 @@ def while_case_4():
     output_examples = [[("x", 32)],
                        [("x", 32)]]
 
-    output_program = get_io_program(orig_program, inputs_examples, output_examples, disable_prints, 0, 10, None, None, linv, unroll_limit)
+    output_program = get_io_program(orig_program, inputs_examples, output_examples, disable_prints, None, None, linv, unroll_limit)
 
     assertion = output_program == expected_program
     return assert_with_color(assertion, output_program, expected_program)
@@ -260,7 +260,7 @@ def while_case_5():
     output_examples = [[("x", 10)],
                        [("x", 11)]]
 
-    output_program = get_io_program(orig_program, inputs_examples, output_examples, disable_prints, 0, 10, None, None, linv, unroll_limit)
+    output_program = get_io_program(orig_program, inputs_examples, output_examples, disable_prints, None, None, linv, unroll_limit)
 
     assertion = output_program == expected_program
     return assert_with_color(assertion, output_program, expected_program)
@@ -280,7 +280,7 @@ def while_case_6():
     output_examples = [[("x", 3)],
                        [("x", 3)]]
 
-    output_program = get_io_program(orig_program, inputs_examples, output_examples, disable_prints, 0, 3, None, None, linv, unroll_limit)
+    output_program = get_io_program(orig_program, inputs_examples, output_examples, disable_prints, None, None, linv, unroll_limit)
 
     assertion = output_program in expected_program
     return assert_with_color(assertion, output_program, expected_program)
@@ -300,7 +300,7 @@ def while_case_7():
     output_examples = [[("x", 3), ("c1", 2)],
                        [("x", 3), ("c1", 2)]]
 
-    output_program = get_io_program(orig_program, inputs_examples, output_examples, disable_prints, 0, 3, None, None, linv, unroll_limit)
+    output_program = get_io_program(orig_program, inputs_examples, output_examples, disable_prints, None, None, linv, unroll_limit)
 
     assertion = output_program in expected_program
     return assert_with_color(assertion, output_program, expected_program)

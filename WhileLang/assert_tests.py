@@ -118,16 +118,16 @@ def basic_case_6():
 class NoErrorExcpected(Exception):
         pass
 
-def test_synth_program(program, P, Q, linv, expected_program, expected_error=NoErrorExcpected, to_disable_print = disable_prints, lower_bound=-100, upper_bound=100, unroll_limit = 10):
+def test_synth_program(program, P, Q, linv, expected_program, expected_error=NoErrorExcpected, to_disable_print = disable_prints, unroll_limit = 10):
 
     synth = Synthesizer(program)
     try:
         if to_disable_print:
             with open(os.devnull, 'w') as f:
                 with redirect_stdout(f):
-                    returned_program = synth.synth_program(program, P, Q, linv, lower_bound, upper_bound, unroll_limit)
+                    returned_program = synth.synth_program(program, P, Q, linv, unroll_limit)
         else:
-            returned_program = synth.synth_program(program, P, Q, linv, lower_bound, upper_bound, unroll_limit)
+            returned_program = synth.synth_program(program, P, Q, linv, unroll_limit)
     except expected_error as e:
         returned_program = expected_error
     except Exception as e:
@@ -151,7 +151,7 @@ def holes_basic_case_1():
     expected_program = "c1 := 2 ; assert(c1 >= 2) ; c2 := 1 ; a := c1 * x ; b := c2 - 1 ; a := a + b; c := x + x ; assert(a = c)"
     expected_error = NoErrorExcpected
 
-    return test_synth_program(program, P, Q, linv, expected_program, expected_error, disable_prints, -100, 100)
+    return test_synth_program(program, P, Q, linv, expected_program, expected_error, disable_prints)
 
 def holes_basic_case_1():
     program = "c1 := ?? ; assert(c1 >= 2) ; c2 := ?? ; a := c1 * x ; b := c2 - 1 ; a := a + b; c := x + x ; assert(a = c)"
@@ -163,7 +163,7 @@ def holes_basic_case_1():
     expected_program = "c1 := 2 ; assert(c1 >= 2) ; c2 := 1 ; a := c1 * x ; b := c2 - 1 ; a := a + b; c := x + x ; assert(a = c)"
     expected_error = NoErrorExcpected
 
-    return test_synth_program(program, P, Q, linv, expected_program, expected_error, disable_prints, -100, 100)
+    return test_synth_program(program, P, Q, linv, expected_program, expected_error, disable_prints)
 
 def holes_basic_case_2():
     program = "c1 := ?? ; c2 := ?? ; a := c1 * x ; b := c2 - 1 ; a := a + b; c := x + x ; assert(a = c)"
@@ -175,7 +175,7 @@ def holes_basic_case_2():
     expected_program = "c1 := 2 ; c2 := 1 ; a := c1 * x ; b := c2 - 1 ; a := a + b; c := x + x ; assert(a = c)"
     expected_error = NoErrorExcpected
 
-    return test_synth_program(program, P, Q, linv, expected_program, expected_error, disable_prints, -100, 100)
+    return test_synth_program(program, P, Q, linv, expected_program, expected_error, disable_prints)
 
 # def holes_basic_not_so_basic():
 #     program = "c1 := ?? ; c2 := ?? ; a := c1 * x ; b := c2 + 2 ; a := a + b; c := x + x ; assert(a != c)"
@@ -197,7 +197,7 @@ def holes_basic_case_3():
     expected_program = "x := 2 * 3 ; if x = 6 then y := 4 else skip ; assert y = 4"
     expected_error = NoErrorExcpected
 
-    return test_synth_program(program, P, Q, linv, expected_program, expected_error, disable_prints, -100, 100)
+    return test_synth_program(program, P, Q, linv, expected_program, expected_error, disable_prints)
 
 def holes_basic_case_4():
     program = "x := 8 + ?? ; z:= x + 8;  if z = 20 then y := 8 else y := 5; assert y = 8"
@@ -209,7 +209,7 @@ def holes_basic_case_4():
     expected_program = "x := 8 + 4 ; z:= x + 8;  if z = 20 then y := 8 else y := 5; assert y = 8"
     expected_error = NoErrorExcpected
 
-    return test_synth_program(program, P, Q, linv, expected_program, expected_error, disable_prints, -100, 100)
+    return test_synth_program(program, P, Q, linv, expected_program, expected_error, disable_prints)
 
 def holes_basic_case_5():
     program = "x:= 2; y:= ?? ; assert (y - 1) > x; if (y - 3) = 5 then x := x + ?? else x:= x + 2 ; assert (x = 5)"
@@ -221,7 +221,7 @@ def holes_basic_case_5():
     expected_program = "x:= 2; y:= 8 ; assert (y - 1) > x; if (y - 3) = 5 then x := x + 3 else x:= x + 2 ; assert (x = 5)"
     expected_error = NoErrorExcpected
 
-    return test_synth_program(program, P, Q, linv, expected_program, expected_error, disable_prints, 0, 10)
+    return test_synth_program(program, P, Q, linv, expected_program, expected_error, disable_prints)
 
 def holes_basic_case_6():
     program = "x := 8 + ?? ; if z = (y + ??) then y := 20 - x else y := 5; assert y = 8"
@@ -233,7 +233,7 @@ def holes_basic_case_6():
     expected_program = "x := 8 + 8 ; z:= x + 8;  if z = 20 then y := 8 else y := 5; assert y = 8"
     expected_error = Synthesizer.ProgramNotVerified
 
-    return test_synth_program(program, P, Q, linv, expected_program, expected_error, disable_prints, -100, 100)
+    return test_synth_program(program, P, Q, linv, expected_program, expected_error, disable_prints)
 
 def holes_basic_case_7():
     program = "x:= 3; y:= ??; assert ((y - 1) > x); if (y - 3) = 5 then x := x + ?? else x:= x + 6"
@@ -245,7 +245,7 @@ def holes_basic_case_7():
     expected_program = "x:= 3; y:= 8; assert ((y - 1) > x); if (y - 3) = 5 then x := x + 5 else x:= x + 6"
     expected_error = NoErrorExcpected
 
-    return test_synth_program(program, P, Q, linv, expected_program, expected_error, disable_prints, -100, 100)
+    return test_synth_program(program, P, Q, linv, expected_program, expected_error, disable_prints)
 
 def holes_no_sol_case_1():
     program = "y:= x + ?? ; if y = 10 then x := 5 else x := 9"
@@ -257,7 +257,7 @@ def holes_no_sol_case_1():
     expected_program = ""
     expected_error = Synthesizer.ProgramNotVerified
 
-    return test_synth_program(program, P, Q, linv, expected_program, expected_error, disable_prints, -100, 100)
+    return test_synth_program(program, P, Q, linv, expected_program, expected_error, disable_prints)
 
 def holes_no_sol_case_2():
     program = "y := ?? ; if x < 6 then ( x := y + 4 ) else skip  ; assert x = 6"
@@ -269,10 +269,10 @@ def holes_no_sol_case_2():
     expected_program = ""
     expected_error = Synthesizer.ProgramNotVerified
 
-    return test_synth_program(program, P, Q, linv, expected_program, expected_error, disable_prints, -100, 100)
+    return test_synth_program(program, P, Q, linv, expected_program, expected_error, disable_prints)
 
 # def holes_while_case_1():
-#     program = "y := ?? ; while x < 6 do ( x := y + 4 ) ; assert x = 6"
+#     program = "t := ?? ; if x < t then x := 0 else x := 1 ; assert x = 0"
 
 #     P = lambda d: True
 #     Q = lambda d: True
@@ -292,7 +292,7 @@ def holes_while_case_1():
     expected_program = "y := 0 ; x := 0 ; t := 5 ; while x < t do ( y := y + 1 ; x := x + 1)  ; assert y = 5"
     expected_error = NoErrorExcpected
 
-    return test_synth_program(program, P, Q, linv, expected_program, expected_error, disable_prints, -100, 100, 10)
+    return test_synth_program(program, P, Q, linv, expected_program, expected_error, disable_prints, 10)
 
 def holes_while_case_2():
     program = "x := 0 ; t := ?? ; while x < t do ( x := x + 1 ; assert t = 3) ; assert x > 0"
@@ -303,7 +303,7 @@ def holes_while_case_2():
     expected_program = "x := 0 ; t := 3 ; while x < t do ( x := x + 1 ; assert t = 3) ; assert x > 0"
     expected_error = NoErrorExcpected
 
-    return test_synth_program(program, P, Q, linv, expected_program, expected_error, disable_prints, -100, 100, 10)
+    return test_synth_program(program, P, Q, linv, expected_program, expected_error, disable_prints, 10)
 
 
 def holes_while_case_3():
@@ -318,7 +318,7 @@ def holes_while_case_3():
     expected_program = "x := 0 ; t := 6 ; while x < t do ( x := x + 9 ; assert t = 6) ; assert x > 0 ; assert x = 9"
     expected_error = NoErrorExcpected
 
-    return test_synth_program(program, P, Q, linv, expected_program, expected_error, disable_prints, -100, 100, 10)
+    return test_synth_program(program, P, Q, linv, expected_program, expected_error, disable_prints, 10)
 
 def dummy():
     program = "y := 0 ; x := 0 ; t := ?? ; while x < t do ( y := y + 1 ; x := x + 1)  ; assert y = 10"
@@ -340,7 +340,7 @@ def dummy():
     # linv = lambda d: And(d["x"] <= 10)#, d["t"] == 10)
     # is_exist_input_to_satisfy(P, parse(program), Q, linv)
 
-    # return test_synth_program(program, P, Q, linv, expected_program, expected_error, False, -100, 100)
+    # return test_synth_program(program, P, Q, linv, expected_program, expected_error, False)
 
 
     # program = "x := 0; x:= hole_0; a := 0 ; while a != 1 do ( a := 1 )"# ; assert x = 10"

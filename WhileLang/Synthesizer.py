@@ -188,7 +188,7 @@ class Synthesizer:
         non_holes_dict = {k: v for k, v in dict.items() if not hole_pattern.match(k)}
         return non_holes_dict
 
-    def synth_IO_program(self, orig_program, inputs, outputs, lower_bound = -100, upper_bound = 100, P = None, Q = None, linv = None, unroll_limit = 8, raise_errors = False):
+    def synth_IO_program(self, orig_program, inputs, outputs, P = None, Q = None, linv = None, unroll_limit = 8, raise_errors = False):
         """Synthesizes a program using input-output examples."""
         
         if P is None:
@@ -313,7 +313,7 @@ class Synthesizer:
             for child in ast.subtrees:
                 self.fill_ast_holes(child, holes)
 
-    def synth_program(self, orig_program, P, Q, linv = None, lower_bound = -100, upper_bound = 100, unroll_limit = 10):
+    def synth_program(self, orig_program, P, Q, linv = None, unroll_limit = 10):
 
         print("******\n")
 

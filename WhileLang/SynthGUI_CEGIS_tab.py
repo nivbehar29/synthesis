@@ -40,9 +40,9 @@ def synth_program_cegis(program, P, Q, linv, debug=False, unroll_limit=10):
     if not debug:
         with open(os.devnull, 'w') as f:
             with redirect_stdout(f):
-                returned_program = synth.synth_program(program, P, Q, linv, None, None, unroll_limit)
+                returned_program = synth.synth_program(program, P, Q, linv, unroll_limit)
     else:
-        returned_program = synth.synth_program(program, P, Q, linv, None, None, unroll_limit)
+        returned_program = synth.synth_program(program, P, Q, linv, unroll_limit)
 
     return returned_program
 
