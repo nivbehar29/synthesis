@@ -379,10 +379,8 @@ class Synthesizer:
             for child in ast.subtrees:
                 self.fill_ast_holes(child, holes)
 
-    def synth_program(self, orig_program, P, Q, linv = None, unroll_limit = 10):
-
-        print("******\n")
-
+    
+    def cegis_init_checks(self, orig_program, P, Q, linv, unroll_limit):
         ast_orig = parse(orig_program)
         if(self.ast_orig is None):
             raise self.ProgramNotValid("The given program can't be parsed")
@@ -431,22 +429,35 @@ class Synthesizer:
         print(f"program_holes_unrolled: \n{program_holes_unrolled}\n")
 
         # Checks for the existence of an input that satisfies the conditions
-        print(holes_program)
-        is_there_valid_input, solver_valid = is_exist_input_to_satisfy(P, ast_holes_unrolled, Q, linv)
-        print("is_there_valid_input: ", is_there_valid_input)
-        if(is_there_valid_input == False):
-            raise self.NoInputToSatisfyProgram("The given program has no input which can satisfy the conditions")
+        # print(holes_program)
+        # is_there_valid_input, solver_valid = is_exist_input_to_satisfy(P, ast_holes_unrolled, Q, linv)
+        # print("is_there_valid_input: ", is_there_valid_input)
+        # if(is_there_valid_input == False):
+        #     raise self.NoInputToSatisfyProgram("The given program has no input which can satisfy the conditions")
+        # if solver_valid != None:
+        #     del solver_valid
+        
+        return holes, holes_program, program_holes_unrolled
+    
+    def synth_program(self, orig_program, P, Q, linv = None, unroll_limit = 10):
 
-        # filled_program, filled_holes_dict = self.fill_holes_with_zeros(holes_program, holes)
+        # Checks if the given program can be parsed, have holes, and variables names are valid
+        # Also returns the holes, holes program, and program with holes unrolled  
+        holes, holes_program, program_holes_unrolled = self.cegis_init_checks(orig_program, P, Q, linv, unroll_limit)
 
-        # print("ast_unrolled_filled_with_zeros: ", ast_unrolled_filled_with_zeros)
+        # First, we fill the program holes with zeros
         filled_program, filled_holes_dict = self.fill_holes_with_zeros(program_holes_unrolled, holes)
-           
+
+        # Initialize the final holes predicate
         final_holes_p = lambda d: True
 
+        # Initialize holes dictionary
         new_holes_dict = {}
 
+        # initialize iteration counter
+        k = 0
         while(True):
+            k += 1
             print("\n*******************************************\n")
             ast_filled = parse(filled_program)
             result, solver = verify(P, ast_filled, Q, linv=linv)
@@ -457,17 +468,8 @@ class Synthesizer:
                 print("holes to fill with zeroes:", holes_to_fill_with_zeroes)
                 filled_program_final, _ = self.fill_holes_with_zeros(filled_program_final, holes_to_fill_with_zeroes)
                 print(f"final filled program: {filled_program_final}")
-                return filled_program_final
-
-                # check that the final filled program is verified. maybe this should be done by the user
-                # final_result, _ = verify(P, parse(filled_program_final), Q, linv=linv)
-                # if(final_result == True):
-                #     print("The final program is verified")
-                #     return filled_program_final
-                # else:
-                #     print("The final program is not verified")
-                #     return ""
-                
+                print("num of iterations:", k)
+                return filled_program_final          
             
             ce = self.extract_counter_example_from_dict(extract_model_assignments(solver))
             if ce == {}:
@@ -510,9 +512,9 @@ class Synthesizer:
             final_P = lambda d, p = P, h = final_holes_p: And(p(d), h(d))
 
             print("Finding holes")
-            # result, solver = self.find_holes(ast_holes, final_P, Q, linv=linv)
             result, solver = self.find_holes(ast_holes_inputs, final_P, Q, linv=linv)
             if result == False:
+                print("num of iterations:", k)
                 raise self.ProgramNotVerified("The given program can't be verified for all possible inputs")
             else:
                 print("holes:", solver.model())
@@ -522,6 +524,7 @@ class Synthesizer:
 
             if new_holes_dict == {}:
                 print("No new holes found")
+                print("num of iterations:", k)
                 return ""
             
             del solver
@@ -666,14 +669,7 @@ def test_assertions():
 
 def main():
 
-    # test_assertions()
-
-    program = "x:= 3; y:= hole_0 ; assert ((y - 1) > x); if (y - 3) = 5 then x := x + hole_1 else x:= x + 6"
-
-    ast = parse(program)
-    print(ast)
-    fill_ast_holes(ast, {'hole_0': 111111, 'hole_1': 22222})
-    print(ast)
+    test_assertions()
 
 
 if __name__ == "__main__":

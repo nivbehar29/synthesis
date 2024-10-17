@@ -243,7 +243,7 @@ def holes_no_sol_case_1():
     linv = lambda d: True
 
     expected_program = ""
-    expected_error = Synthesizer.NoInputToSatisfyProgram
+    expected_error = Synthesizer.ProgramNotVerified
 
     return test_synth_program(program, P, Q, linv, expected_program, expected_error, disable_prints)
 

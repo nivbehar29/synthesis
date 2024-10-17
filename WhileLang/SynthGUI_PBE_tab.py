@@ -200,6 +200,10 @@ def set_examples_routine(tab: PBE_Tab):
     open_examples_window(tab, tab.parameters, tab.examples)
 
 
+# ------------------------------
+# Synthesize PBE
+# ------------------------------
+
 def synth_program_pbe(program, P, Q, linv, inputs_examples, output_examples, debug=False, unroll_limit=10):
     returned_program = ""
     synth = Synthesizer(program)
