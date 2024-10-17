@@ -79,7 +79,7 @@ def linear_case_2():
 
 def multiple_ios_case_1():
     orig_program =     "c1 := 4 * x ; c2 := 4 * y ; c3 := 4 * z"
-    expected_program = "c1 := 4 * x ; c2 := 4 * y ; c3 := 4 * z"
+    expected_program = "" # no holes => nothing to synthesize
 
     inputs_examples = [[("x", 1), ("y", 2), ("z", 3)],
                        [("x", 2), ("y", 4), ("z", 6)]]
@@ -153,6 +153,72 @@ def no_inputs_case_2():
     assertion = output_program == expected_program
     return assert_with_color(assertion, output_program, expected_program)
 
+def P_Q_case_1():
+    orig_program =     "x := 3 ; c1 := ?? ; if c1 = c2 then d := 1 else d := 0"
+    expected_program = "x := 3 ; c1 := 7 ; if c1 = c2 then d := 1 else d := 0"
+
+    inputs_examples = [[("x",3)]]
+    
+    output_examples = [[]]
+
+    P = lambda d: d["c2"] == 7
+    Q = lambda d: d["d"] == 1
+
+    output_program = get_io_program(orig_program, inputs_examples, output_examples, disable_prints, P, Q)
+
+    assertion = output_program == expected_program
+    return assert_with_color(assertion, output_program, expected_program)
+
+
+
+def no_ios_case_1():
+    orig_program =     "c2 := 10 ; c1 := c2"
+    expected_program = "" # no holes => nothing to synthesize
+
+    inputs_examples = [[]]
+    
+    output_examples = [[]]
+
+    P = lambda d: True
+    Q = lambda d: d["c1"] == 7
+
+    output_program = get_io_program(orig_program, inputs_examples, output_examples, disable_prints, P, Q)
+
+    assertion = output_program == expected_program
+    return assert_with_color(assertion, output_program, expected_program)
+
+def no_ios_case_2():
+    orig_program =     "c2 := 10 ; c1 := c2"
+    expected_program = "" # no holes => nothing to synthesize
+
+    inputs_examples = [[]]
+    
+    output_examples = [[]]
+
+    P = lambda d: d["c2"] == 10
+    Q = lambda d: d["c1"] == 7
+
+    output_program = get_io_program(orig_program, inputs_examples, output_examples, disable_prints, P, Q)
+
+    assertion = output_program == expected_program
+    return assert_with_color(assertion, output_program, expected_program)
+
+def no_ios_case_3():
+    orig_program =     "x := ?? ; c1 := c2"
+    expected_program = "" # no ios => nothing to synthesize
+
+    inputs_examples = [[]]
+    
+    output_examples = [[]]
+
+    P = lambda d: d["c2"] == 10
+    Q = lambda d: And(d["c1"] == 7, d["x"] == 1)
+
+    output_program = get_io_program(orig_program, inputs_examples, output_examples, disable_prints, P, Q)
+
+    assertion = output_program == expected_program
+    return assert_with_color(assertion, output_program, expected_program)
+
 def no_inputs_case_3():
     orig_program =     "c1 := ?? ; c2 := ?? ; if c1 = c2 then d := 1 else d := 0"
     expected_program = ""
@@ -164,6 +230,39 @@ def no_inputs_case_3():
                        [("c2", 3), ("d", 1)]]
 
     output_program = get_io_program(orig_program, inputs_examples, output_examples, disable_prints)
+
+    assertion = output_program == expected_program
+    return assert_with_color(assertion, output_program, expected_program)
+
+def contradiction_case_1():
+    orig_program =     "x := ?? ; c1 := c2 "
+    expected_program = ""
+
+    inputs_examples = [[]]
+    
+    output_examples = [[("x", 1)]]
+    
+    P = lambda d: d["c2"] == 5
+    Q = lambda d: And(d["x"] == 14, d["c1"] == 3)
+
+    output_program = get_io_program(orig_program, inputs_examples, output_examples, disable_prints, P, Q)
+
+    assertion = output_program == expected_program
+    return assert_with_color(assertion, output_program, expected_program)
+
+def contradiction_case_2():
+    orig_program =     "z := ?? ; x := y ; while a != b do (a := b) ; y := 123; x := y"
+    expected_program = ""
+
+    inputs_examples = [[("y", 1)]]
+    
+    output_examples = [[]]
+    
+    P = lambda d: And(d['a'] > 0, d['b'] > 0)
+    Q = lambda d: And(d['a'] > 0, d['a'] == d['b'], d['x'] == 3)
+    linv = lambda d: And(d['a'] > 0, d['b'] > 0)
+
+    output_program = get_io_program(orig_program, inputs_examples, output_examples, disable_prints, P, Q, linv)
 
     assertion = output_program == expected_program
     return assert_with_color(assertion, output_program, expected_program)
@@ -185,7 +284,7 @@ def dont_care_case_1():
 
 def while_case_1():
     orig_program =     "while a != b do if a > b then a := a - b else b := b - a"
-    expected_program = "while a != b do if a > b then a := a - b else b := b - a"
+    expected_program = "" # no holes => nothing to synthesize
 
     linv = None
 
@@ -323,7 +422,13 @@ def pbe_tests():
     aux_cases = [
         no_inputs_case_1,
         no_inputs_case_2,
-        no_inputs_case_3
+        no_inputs_case_3,
+        P_Q_case_1,
+        no_ios_case_1,
+        no_ios_case_2,
+        no_ios_case_3,
+        contradiction_case_1,
+        contradiction_case_2,
     ]
 
     dond_care_cases = [

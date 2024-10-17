@@ -20,6 +20,10 @@ class Synthesizer:
     class ProgramHasNoHoles(Exception):
         """Raised when a specific program has no holes."""
         pass
+
+    class NoExamplesProvided(Exception):
+        """Raised when a specific program is not valid."""
+        pass
     
     class ProgramNotVerified(Exception):
         """Raised when a specific program can't be verified."""
@@ -210,19 +214,42 @@ class Synthesizer:
         print("Pvars: ", pvars)
 
         print("generating conditions")
-        _, Q_final, examples_inputs_tuples, output_example_tuples = self.generate_conditions(inputs, outputs, pvars)
+        P_inputs, Q_outputs, examples_inputs_tuples, output_example_tuples = self.generate_conditions(inputs, outputs, pvars)
 
-        for i in range(len(Q_final)):
-            prev_Q_i = copy.deepcopy(Q_final[i])
+        # Add Q conditions for each output example
+        for i in range(len(Q_outputs)):
+            prev_Q_i = copy.deepcopy(Q_outputs[i])
             Q_add = copy.deepcopy(Q)
-            Q_final[i] = lambda d, q_cond = prev_Q_i, q = Q_add: And(q(d), q_cond(d))
+            Q_outputs[i] = lambda d, q_cond = prev_Q_i, q = Q_add: And(q(d), q_cond(d))
+
+        # Add P conditions for each input example
+        # for i in range(len(P_inputs)):
+        #     prev_P_i = copy.deepcopy(P_inputs[i])
+        #     P_add = copy.deepcopy(P)
+        #     P_inputs[i] = lambda d, p_cond = prev_P_i, p = P_add: And(p(d), p_cond(d))
+
 
         holes_program, holes = self.process_holes(orig_program) # Replace all occurrences of '??' with unique hole variables, returnes program with holes vars, and holes vars list
         
-        if(raise_errors and holes == []):
+        if(holes == []):
             print("Error: The given program has no holes in it")
-            raise self.ProgramHasNoHoles("The given program has no holes in it")
+            if raise_errors:
+                raise self.ProgramHasNoHoles("The given program has no holes in it")
+            return ""
         
+        # Checks for the existence of an input that satisfies the conditions
+        # Currently unused because we can't get it write for program which has while loops.
+        # But - when unrolling the loops, it does work, so we can use it for the unrolled program
+        # print("holes program: ", holes_program)
+        # ast_holes = parse(holes_program)
+        # is_exist_input, _ = is_exist_input_to_satisfy(P, ast_holes, Q, linv=linv)
+        # if(is_exist_input == False):
+        #     print("Error: The given program has no input which can satisfy the conditions")
+        #     if raise_errors:
+        #         raise self.NoInputToSatisfyProgram("The given program has no input which can satisfy the conditions")
+        #     return ""
+
+
         print("Holes:", holes)
         ast_holes_unrolled = parse_and_unroll(holes_program, unroll_limit)
         if(ast_holes_unrolled is None):
@@ -233,6 +260,15 @@ class Synthesizer:
         
         program_holes_unrolled = tree_to_program(ast_holes_unrolled)
 
+        # Checks for the existence of an input that satisfies the conditions
+        print("program holes unrolled: ", program_holes_unrolled)
+        is_exist_input, _ = is_exist_input_to_satisfy(P, ast_holes_unrolled, Q, linv=linv)
+        if(is_exist_input == False):
+            print("Error: The given program has no input which can satisfy the conditions")
+            if raise_errors:
+                raise self.NoInputToSatisfyProgram("The given program has no input which can satisfy the conditions")
+            return ""
+
         
         solver = Solver()
         VC = []
@@ -242,31 +278,40 @@ class Synthesizer:
         print("inputs: ", inputs)
         print("outputs: ", outputs)
 
-        for i in range(len(inputs)):            
-            
-            P_i = copy.deepcopy(P)
+        if(len(inputs) == 0 and len(outputs) == 0):
+            print("Error: No input-output examples has been provided")
+            if(raise_errors):
+                raise self.NoExamplesProvided("No input-output examples has been provided")
+            return ""
+            # wp_stmt = wp.wp(ast_holes_unrolled, Q, linv)
+            # VC.append(Implies(P(wp.env), wp_stmt(wp.env)))
+        else:
+            for i in range(len(inputs)):            
+                
+                P_i = copy.deepcopy(P)
+                # P_i = P_inputs[i]
 
 
-            inputs_code = ""
-            for input in examples_inputs_tuples[i]:
-                print("add input key:", input[0], ":=", input[1])
-                inputs_code += f"{input[0]} := {input[1]} ; "
+                inputs_code = ""
+                for input in examples_inputs_tuples[i]:
+                    print("add input key:", input[0], ":=", input[1])
+                    inputs_code += f"{input[0]} := {input[1]} ; "
 
-            outputs_code = ""
-            # for output in output_example_tuples[i]:
-            #     print("add output key:", output[0], ":=", output[1])
-            #     outputs_code += f"; assert {output[0]} = {output[1]} "
+                outputs_code = ""
+                # for output in output_example_tuples[i]:
+                #     print("add output key:", output[0], ":=", output[1])
+                #     outputs_code += f"; assert {output[0]} = {output[1]} "
 
 
-            holes_program_with_inputs = inputs_code + program_holes_unrolled + outputs_code
-            print("holes_program_with_inputs: \n", holes_program_with_inputs)
-            ast_holes_inputs = parse(holes_program_with_inputs)
+                holes_program_with_inputs = inputs_code + program_holes_unrolled + outputs_code
+                print("holes_program_with_inputs: \n", holes_program_with_inputs)
+                ast_holes_inputs = parse(holes_program_with_inputs)
 
-            # wp = WP(ast_holes_inputs)
-            wp_stmt = wp.wp(ast_holes_inputs, Q_final[i], linv)
+                # wp = WP(ast_holes_inputs)
+                wp_stmt = wp.wp(ast_holes_inputs, Q_outputs[i], linv)
 
-            VC_i = Implies(P_i(wp.env), wp_stmt(wp.env))
-            VC.append(VC_i)
+                VC_i = Implies(P_i(wp.env), wp_stmt(wp.env))
+                VC.append(VC_i)
 
         VC_final = And(VC)
         solver.add(VC_final)

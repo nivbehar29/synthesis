@@ -223,7 +223,7 @@ def run_synthesis_pbe(program_text, queue, loop_unrolling_limit, inputs_examples
     try:
         returned_program = synth_program_pbe(program_text, P, Q, linv, inputs_examples, output_examples, True, loop_unrolling_limit)
         queue.put(returned_program)
-    except (Synthesizer.ProgramNotValid, Synthesizer.ProgramNotVerified, Synthesizer.ProgramHasNoHoles) as e:
+    except (Synthesizer.ProgramNotValid, Synthesizer.ProgramNotVerified, Synthesizer.ProgramHasNoHoles, Synthesizer.NoExamplesProvided) as e:
         print("run_synthesis_cegis raised an exception:", e)
         queue.put(e)
     except Exception as e:
@@ -316,7 +316,7 @@ def process_pbe_program_input():
     queue = multiprocessing.Queue()
     print(pbe.inputs_examples_synth_format)
     print(pbe.outputs_examples_synth_format)
-    process_pbe = multiprocessing.Process(target = run_synthesis_pbe, args=(program_text, queue, loop_unrolling_limit, pbe.inputs_examples_synth_format, pbe.outputs_examples_synth_format, None, pbe.Q_str, pbe.linv_str))
+    process_pbe = multiprocessing.Process(target = run_synthesis_pbe, args=(program_text, queue, loop_unrolling_limit, pbe.inputs_examples_synth_format, pbe.outputs_examples_synth_format, pbe.P_str, pbe.Q_str, pbe.linv_str))
     process_pbe.start()
 
     # Create a wait window which will be destroyed after the synthesis is done. Also pass it a callback function to cancel the synthesis
@@ -355,6 +355,8 @@ def process_pbe_program_input():
                 elif isinstance(synth_result, Synthesizer.ProgramHasNoHoles):
                     error = "Message: Program has no holes. You can try to verify your program."
                     final_output = program_text
+                elif isinstance(synth_result, Synthesizer.NoExamplesProvided):
+                    error = "Error: No input-output examples has been provided"
                 elif isinstance(synth_result, Exception):
                     error = f"An unexpected error occurred: {synth_result}"
                 else:
