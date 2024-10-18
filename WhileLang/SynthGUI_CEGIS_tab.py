@@ -32,6 +32,17 @@ class CEGIS_Tab:
         # Variable to keep track if a verification process has been canceled or not
         self.verification_cancelled = False
 
+        # Interactive variables
+        self.synth : Synthesizer = None
+        self.interactive_window : Toplevel = None # interactive window
+        self.interactive_var : tk.IntVar = None # enable \ disable interactive mode (checkbox state)
+        self.generator = None # generator function to make a step
+        self.last_step = None # last step that was performed
+        self.state_list_box: tk.Listbox = None
+        self.states = [] # List of states
+        self.states_dict = {} # Dictionary of states, where the key is the state name and the value is the description of the state
+        self.state_description_box: tk.Text = None
+
 cegis = CEGIS_Tab()
 
 def synth_program_cegis(program, P, Q, linv, debug=False, unroll_limit=10):
@@ -88,6 +99,146 @@ def create_wait_window_cegis(root, wait_window_text, cancel_callback):
 
     return wait_window
 
+cegis.states = [  
+            "State_0",
+            "State_1",
+            "State_2",
+            "State_3_1",
+            "State_3_2",
+            "State_3_3",
+            "State_4_1",
+            "State_4_2",
+            "State_5",
+        ]
+
+cegis.states_dict = {
+    "State_0": ("initialization", "Initialize the program"),
+    "State_1": ("Replace holes with variables", "Replace all occurrences of '??' with unique hole variables"),
+    "State_2": ("Fill holes with zeroes", "Fills the program holes with zeros"),
+    "State_3_1": ("Try to verify the program", "Try to verify the program"),
+    "State_3_2": ("Verification succeeded", "Verification succeeded, fill program with current holes"),
+    "State_3_3": ("Verification failed", "Verification failed, show counter example"),
+    "State_4_1": ("Try to find new holes", "Try to find new holes"),
+    "State_4_2": ("Couldn't find new holes", "Couldn't find new holes"),
+    "State_5": ("New holes found", "New holes found, Fill program with the new holes")
+}
+
+def update_state_description(event, tab: CEGIS_Tab):
+    selected_index = tab.state_list_box.curselection()
+
+    if not selected_index:
+        return
+    
+    description = tab.states_dict[tab.states[selected_index[0]]][1]
+
+    # Update the text box with the corresponding description
+    tab.state_description_box.delete(1.0, tk.END)  # Clear previous text
+    tab.state_description_box.insert(tk.END, description)
+
+def next_step(tab: CEGIS_Tab, to_disable_prints = True):
+
+    # Here, perform the last step that was actually done
+    last_state = tab.last_step[0]
+
+
+
+    # Now, perform the next step
+
+    try:
+        if to_disable_prints:
+            with open(os.devnull, 'w') as f:
+                with redirect_stdout(f):
+                    tab.last_step = next(tab.generator)
+        else:
+            tab.last_step = next(tab.generator)
+        print(f"step: {tab.last_step}")
+
+        # Highlight the current state
+        highlight_state(tab.state_list_box, tab.states.index(tab.last_step[0]), tab.states.index(last_state))
+
+    except StopIteration:
+        print("StopIteration has been raised")
+
+def highlight_state(state_list_box: tk.Listbox, index, prev_index):
+    # Clear any previous selection
+    
+    selected_indices = state_list_box.curselection()
+    print("selected_indices:", selected_indices)
+    if selected_indices:
+        state_list_box.selection_clear(selected_indices, tk.END)
+
+    print("prev_index:", prev_index)
+    state_list_box.itemconfig(prev_index, {'bg': 'white', 'fg': 'black'})
+
+    # Highlight the selected state
+    state_list_box.selection_set(index)
+    state_list_box.activate(index)
+    state_list_box.itemconfig(index, {'bg': 'yellow', 'fg': 'black'})
+
+# Initializes the Interactive window
+def create_interactive_window(tab: CEGIS_Tab, program, P, Q, linv):
+    # Check if the window is already open
+    # if tab.interactive_window is not None and tab.interactive_window.winfo_exists():
+    #     tab.interactive_window.lift()  # Bring the existing window to the front
+    #     return
+
+    # Create a new window
+    tab.interactive_window = Toplevel(tab.root)
+    tab.interactive_window.title("Interactive CEGIS")
+    tab.interactive_window.geometry("1600x800")
+
+    # Label for the window
+    window_label = tk.Label(tab.interactive_window, text="Interactive CEGIS", font=("Helvetica", 14))
+    window_label.pack(pady=10)
+
+
+    # Create states window
+    state_list_box_label = tk.Label(tab.interactive_window, text="States:", font=("Helvetica", 12))
+    state_list_box_label.place(x = 20, y=40)
+
+    concatenated_strings = [f"{key}: {value[0]}" for key, value in cegis.states_dict.items()]
+    longest_string = max(concatenated_strings, key=len)
+    longest_string_len = len(longest_string)
+    print("longest_string:", longest_string)
+    print("longest_string_len:", longest_string_len)
+    tab.state_list_box = tk.Listbox(tab.interactive_window, height=len(tab.states), width = longest_string_len)
+    tab.state_list_box.place(x = 20, y=65)
+
+    for state in tab.states:
+        tab.state_list_box.insert(tk.END, state + " - " + tab.states_dict[state][0])
+
+    tab.state_list_box.update_idletasks()
+
+    # Create selected state description
+    states_description_label = tk.Label(tab.interactive_window, text="State description:", font=("Helvetica", 12))
+    states_description_label.place(x = tab.state_list_box.winfo_width() + tab.state_list_box.winfo_x(), y=state_list_box_label.winfo_y())
+
+    tab.state_description_box = tk.Text(tab.interactive_window, height=len(tab.states), width=30, wrap=tk.WORD)
+    tab.state_description_box.place(x = tab.state_list_box.winfo_width() + tab.state_list_box.winfo_x(), y=tab.state_list_box.winfo_y())
+
+    tab.state_list_box.bind('<<ListboxSelect>>', lambda event: update_state_description(event, tab))  # Prevent selection with mouse clicks
+
+    # Prevent the user from manually selecting items
+    # def disable_selection(event):
+    #     return "break"  # Prevents the default action
+    # tab.state_list_box.bind("<Button-1>", disable_selection)  # Prevent selection with mouse clicks
+    # tab.state_list_box.bind("<Key>", disable_selection)  # Prevent selection with keyboard
+    # tab.state_list_box.bind("<B1-Motion>", disable_selection)       # Prevent selection by dragging
+    # tab.state_list_box.bind("<ButtonRelease-1>", disable_selection) # Prevent selection when releasing mouse button
+
+    highlight_state(tab.state_list_box, 0, 0)
+    tab.last_step = (tab.states[0], tab.states_dict[tab.states[0]][1])
+    
+    
+
+
+    tab.synth = Synthesizer(program)
+    tab.generator = tab.synth.cegis_interactive(program, P, Q, linv, 10)
+
+    # Create a 'next' button
+    set_linv_button = tk.Button(tab.interactive_window, text="Next step", command=lambda: next_step(cegis, True))
+    set_linv_button.place(x = 300, y=400)  # Set the position of the button (x, y)
+
 # Function to handle the button press
 def process_assertion_program_input():
 
@@ -109,64 +260,76 @@ def process_assertion_program_input():
         set_disabled_window_text_flash(cegis.message_text, "Error: Loop unrolling limit must be greater than or equal to 0.", True)
         return
 
-    queue = multiprocessing.Queue()
-    process = multiprocessing.Process(target = run_synthesis_cegis, args=(program_text, queue, loop_unrolling_limit, cegis.P_str, cegis.Q_str, cegis.linv_str))
-    process.start()
+    if(cegis.interactive_var.get() == 1):
+        print("Interactive mode is enabled")
+        P, Q, linv = eval_conditions(cegis.P_str, cegis.Q_str, cegis.linv_str)
+        interactive_window = create_interactive_window(cegis, program_text, P, Q, linv)
+        # Open the conditions window
+    else:
+        queue = multiprocessing.Queue()
+        process = multiprocessing.Process(target = run_synthesis_cegis, args=(program_text, queue, loop_unrolling_limit, cegis.P_str, cegis.Q_str, cegis.linv_str))
+        process.start()
 
-    # Create a wait window which will be destroyed after the synthesis is done. Also pass it a callback function to cancel the synthesis
-    wait_window = create_wait_window_cegis(cegis.root,"Please wait while synthesizing...", cancel_process_cegis)
+        # Create a wait window which will be destroyed after the synthesis is done. Also pass it a callback function to cancel the synthesis
+        wait_window = create_wait_window_cegis(cegis.root,"Please wait while synthesizing...", cancel_process_cegis)
 
-    # Prevent pressing the main window while the wait window is open
-    wait_window.grab_set()
+        # Prevent pressing the main window while the wait window is open
+        wait_window.grab_set()
 
-    # Function to check the process status, waiting for it to finish and then display the result
-    def check_process():
+        # Function to check the process status, waiting for it to finish and then display the result
+        def check_process():
 
-        if process.is_alive():
-            # Schedule the next check after 100 ms
-            cegis.root.after(100, check_process)
-        else:
-            print("check_process: process has finished.")
-            # Code here will execute only after the process has finished
+            if process.is_alive():
+                # Schedule the next check after 100 ms
+                cegis.root.after(100, check_process)
+            else:
+                print("check_process: process has finished.")
+                # Code here will execute only after the process has finished
 
-            # Close the wait window and display the result
-            wait_window.destroy()
+                # Close the wait window and display the result
+                wait_window.destroy()
 
-            if not queue.empty():
+                if not queue.empty():
 
-                # Get the result from the queue
-                synth_result = queue.get()
-                final_output = ""
-                error = ""
-                # cegis.output_text.insert("1.0", f"Error: {str(result)}")
-                if isinstance(synth_result, Synthesizer.ProgramNotValid):
-                    error = "Error: The given program can't be parsed"
-                elif isinstance(synth_result, Synthesizer.ProgramHasNoHoles):
-                    error = "Message: Program has no holes. You can try to verify your program."
-                    print("synthesis result:", program_text)
-                    final_output = remove_assertions_program(program_text)
-                elif isinstance(synth_result, Synthesizer.ProgramNotVerified):
-                    error = "Error: The program can't be verified for all possible inputs. If this is not the excpected outcome:\n "
-                    error += "1. Try increasing the loop unrolling limit.\n"
-                    error += "2. Check if the loop invariant is correct.\n"
-                    error += "3. Check if the pre-condition and post-condition are correct."
-                elif isinstance(synth_result, Synthesizer.ProgramHasInvalidVarName):
-                    error = f"Error: Invalid variable name: {synth_result}.\nPlease use valid variable names which are not of the form 'hole_x', where x is a number."    
-                elif isinstance(synth_result, Exception):
-                    error = f"An unexpected error occurred: {synth_result}"
-                else:
-                    print("synthesis result:", synth_result)
-                    final_output = remove_assertions_program(synth_result)
+                    # Get the result from the queue
+                    synth_result = queue.get()
+                    final_output = ""
+                    error = ""
+                    # cegis.output_text.insert("1.0", f"Error: {str(result)}")
+                    if isinstance(synth_result, Synthesizer.ProgramNotValid):
+                        error = "Error: The given program can't be parsed"
+                    elif isinstance(synth_result, Synthesizer.ProgramHasNoHoles):
+                        error = "Message: Program has no holes. You can try to verify your program."
+                        print("synthesis result:", program_text)
+                        final_output = remove_assertions_program(program_text)
+                    elif isinstance(synth_result, Synthesizer.ProgramNotVerified):
+                        error = "Error: The program can't be verified for all possible inputs. If this is not the excpected outcome:\n "
+                        error += "1. Try increasing the loop unrolling limit.\n"
+                        error += "2. Check if the loop invariant is correct.\n"
+                        error += "3. Check if the pre-condition and post-condition are correct."
+                    elif isinstance(synth_result, Synthesizer.ProgramHasInvalidVarName):
+                        error = f"Error: Invalid variable name: {synth_result}.\nPlease use valid variable names which are not of the form 'hole_x', where x is a number."    
+                    elif isinstance(synth_result, Exception):
+                        error = f"An unexpected error occurred: {synth_result}"
+                    else:
+                        print("synthesis result:", synth_result)
+                        final_output = remove_assertions_program(synth_result)
 
-                if(error != ""):
-                    set_disabled_window_text_flash(cegis.message_text, error, True)
-                    cegis.verify_program_button.config(state='disabled')  # Disable the button
-                    set_disabled_window_text(cegis.output_text, "")
+                    if(error != ""):
+                        set_disabled_window_text_flash(cegis.message_text, error, True)
+                        cegis.verify_program_button.config(state='disabled')  # Disable the button
+                        set_disabled_window_text(cegis.output_text, "")
 
-                if(final_output != ""):
-                    if(error == ""):
-                        set_disabled_window_text_flash(cegis.message_text, "The program has been synthesized successfully", False)
-                    set_disabled_window_text(cegis.output_text, final_output)
-                    cegis.verify_program_button.config(state='normal')  # Enable the button
+                    if(final_output != ""):
+                        if(error == ""):
+                            set_disabled_window_text_flash(cegis.message_text, "The program has been synthesized successfully", False)
+                        set_disabled_window_text(cegis.output_text, final_output)
+                        cegis.verify_program_button.config(state='normal')  # Enable the button
 
-    check_process()
+        check_process()
+
+def show_selection():
+    if cegis.interactive_var.get() == 1:
+        print("Checkbox is checked")
+    else:
+        print("Checkbox is unchecked")

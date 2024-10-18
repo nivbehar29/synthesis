@@ -447,16 +447,16 @@ class Synthesizer:
 
         holes, holes_program, program_holes_unrolled, P, Q, linv = self.cegis_init_checks(orig_program, P, Q, linv, unroll_limit)
 
-        yield ("state_0", "Wait for initialization")
+        yield ("State_0", "Wait for initialization")
 
 
-        yield ("state_1", "Replace holes with variables", program_holes_unrolled)
+        yield ("State_1", "Replace holes with variables", program_holes_unrolled)
 
         # First, we fill the program holes with zeros
         filled_program, filled_holes_dict = self.fill_holes_with_zeros(program_holes_unrolled, holes)
 
 
-        yield ("state_2", "Fill holes with zeroes", filled_program)
+        yield ("State_2", "Fill holes with zeroes", filled_program)
 
 
         # Initialize the final holes predicate
@@ -473,7 +473,7 @@ class Synthesizer:
             ast_filled = parse(filled_program)
             result, solver = verify(P, ast_filled, Q, linv=linv)
 
-            yield ("state_3", "Try to verify the program", result, solver)
+            yield ("State_3_1", "Try to verify the program", result, solver)
 
             if result == True:
                 print("The program is verified")
@@ -484,7 +484,7 @@ class Synthesizer:
                 print(f"final filled program: {filled_program_final}")
                 print("num of iterations:", k)
 
-                yield ("state_3_1", "Verification succeeded, fill program with current holes", filled_program_final)
+                yield ("State_3_2", "Verification succeeded, fill program with current holes", filled_program_final)
 
                 return filled_program_final          
             
@@ -493,7 +493,7 @@ class Synthesizer:
                 print("No counter example found - each input is a counter example")
                 # ce = {'x': 0}
 
-            yield ("state_3_2", "Verification failed, show counter example", ce)
+            yield ("State_3_3", "Verification failed, show counter example", ce)
 
             print("counter example dict:", ce)
 
@@ -530,20 +530,27 @@ class Synthesizer:
             # final_P = lambda d, p = P, q = inputs_p, h = final_holes_p: And(p(d), h(d), q(d))
             final_P = lambda d, p = P, h = final_holes_p: And(p(d), h(d))
 
+
             print("Finding holes")
+
+            yield ("State_4_1", "Try to find new holes")
             result, solver = self.find_holes(ast_holes_inputs, final_P, Q, linv=linv)
             if result == False:
                 print("num of iterations:", k)
-                raise self.ProgramNotVerified("The given program can't be verified for all possible inputs")
+                yield ("State_4_2", "Couldn't find new holes", False)
+                return
             else:
                 print("holes:", solver.model())
             
+
+
             new_holes_dict = self.extract_holes_from_dict(extract_model_assignments(solver))
             print("new holes dict:", new_holes_dict)
 
             if new_holes_dict == {}:
                 print("No new holes found")
                 print("num of iterations:", k)
+                yield ("State_4_2", "Couldn't find new holes", False)
                 return ""
             
             del solver
@@ -559,6 +566,8 @@ class Synthesizer:
             print("filled_holes_dict:", filled_holes_dict)
             print("new filled program:")
             print(filled_program)
+
+            yield ("State_5", "New holes found, Fill program with the new holes", True, filled_program)
 
 
 

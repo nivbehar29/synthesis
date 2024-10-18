@@ -322,44 +322,6 @@ def holes_while_case_3():
 
     return test_synth_program(program, P, Q, linv, expected_program, expected_error, disable_prints, 10)
 
-def interactive_mode_test():
-    program = "c1 := ?? ; assert(c1 >= 2) ; c2 := ?? ; a := c1 * x ; b := c2 - 1 ; a := a + b; c := x + x ; assert(a = c)"
-
-    P = lambda d: True
-    Q = lambda d: True
-    linv = lambda d: True
-
-    expected_program = "c1 := 2 ; assert(c1 >= 2) ; c2 := 1 ; a := c1 * x ; b := c2 - 1 ; a := a + b; c := x + x ; assert(a = c)"
-    expected_error = NoErrorExcpected
-
-    def next_step(generator, to_disable_prints = True):
-        try:
-            if to_disable_prints:
-                with open(os.devnull, 'w') as f:
-                    with redirect_stdout(f):
-                        step = next(generator)
-            else:
-                step = next(generator)
-            print(f"step: {step}")
-        except StopIteration:
-            print("StopIteration has been raised")
-
-
-    synth = Synthesizer(program)
-    generator = synth.cegis_interactive(program, P, Q, linv, 10)
-
-    next_step(generator)
-    next_step(generator)
-    next_step(generator)
-    next_step(generator)
-    next_step(generator)
-    next_step(generator)
-    next_step(generator)
-    next_step(generator)
-    next_step(generator)
-    next_step(generator)
-    
-
 def dummy():
     program = "y := 0 ; x := 0 ; t := ?? ; while x < t do ( y := y + 1 ; x := x + 1)  ; assert y = 10"
     # thats a problem because currently we unroll loop 10 times, and only then the program can be satisfied
@@ -457,14 +419,12 @@ def assert_tests():
     ]
 
     test_cases = []
-    # test_cases += basic_cases
-    # test_cases += holes_basic_cases
-    # test_cases += holes_no_sol_cases
-    # test_cases += holes_while_cases
-
+    test_cases += basic_cases
+    test_cases += holes_basic_cases
+    test_cases += holes_no_sol_cases
+    test_cases += holes_while_cases
     
     # test_cases += [dummy]
-    test_cases += [interactive_mode_test]
 
     results = []
 

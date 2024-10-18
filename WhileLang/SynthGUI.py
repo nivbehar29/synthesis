@@ -157,13 +157,20 @@ def create_cegis_tab():
     synthesize_button = tk.Button(assertion_frame, text="Synthesize with Assertion", command=process_assertion_program_input)
     synthesize_button.pack(pady=20)
 
+    # Create an IntVar to store the checkbox state (1 for checked, 0 for unchecked)
+    interactive_var = tk.IntVar()
+    interactive_var.set(1)  # Set the initial value to unchecked
+    # Create a Checkbox for interactive mode
+    interactive_checkbox = tk.Checkbutton(assertion_frame, text="Interactive", variable=interactive_var, command=show_selection)
+    interactive_checkbox.pack(pady=0)
+
     verify_program_button = tk.Button(assertion_frame, text="Verify output Program", state='disabled', command = lambda : verify_output_program(cegis))
     verify_program_button.pack(pady=5)
 
-    return add_condition_button, verify_program_button
+    return add_condition_button, verify_program_button, interactive_var
 
 # Create buttons below the output window
-add_condition_button_cegis, verify_program_button_cegis = create_cegis_tab()
+add_condition_button_cegis, verify_program_button_cegis, interactive_var = create_cegis_tab()
 
 # Start the main GUI loop
 if __name__ == "__main__":
@@ -171,6 +178,7 @@ if __name__ == "__main__":
     cegis.root = root
     cegis.message_text = message_text
     cegis.verify_program_button = verify_program_button_cegis
+    cegis.interactive_var = interactive_var
     cegis.output_text = output_text
     cegis.loop_unrolling_entry = loop_unrolling_entry
     cegis.program_input = program_input
