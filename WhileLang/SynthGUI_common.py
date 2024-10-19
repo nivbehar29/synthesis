@@ -274,6 +274,42 @@ def open_conditions_window(tab):
 # Common Functions
 # ------------------------------
 
+# Scrollable Text Widget Function
+def create_scrollable_text(parent, height, width, x = None, y = None):
+    frame = tk.Frame(parent)
+
+    if x != None and y != None:
+        frame.place(x=x, y=y)
+    else:
+        frame.pack(pady=10, fill=tk.BOTH, expand=True)
+
+    # Create a Text widget
+    text_widget = tk.Text(frame, height=height, width=width, font=("Helvetica", 12))
+    text_widget.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+    # Create a scrollbar
+    scrollbar = tk.Scrollbar(frame, command=text_widget.yview)
+    scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+    # Configure the Text widget to use the scrollbar
+    text_widget.config(yscrollcommand=scrollbar.set)
+
+    return text_widget
+
+def create_scrollable_listbox(root, x, y, height, width):
+    # Create a Listbox widget
+    listbox = tk.Listbox(root, height=10, width=40)
+    listbox.place(x=x, y=y, width=width, height=height)
+
+    # Create a Scrollbar widget and place it next to the Listbox
+    scrollbar = tk.Scrollbar(root, orient="vertical", command=listbox.yview)
+    scrollbar.place(x=x+width, y=y, height=height)
+
+    # Configure the Listbox to work with the Scrollbar
+    listbox.config(yscrollcommand=scrollbar.set)
+
+    return listbox
+
 # Function to evaluate the conditions
 def eval_conditions(P_str, Q_str, linv_str):
     P = lambda _: True

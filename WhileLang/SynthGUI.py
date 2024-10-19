@@ -41,27 +41,6 @@ loop_unrolling_entry.insert(0, "10")  # Set default value
 loop_unrolling_entry.pack(pady=5)
 
 
-# ------------------------------
-# Scrollable Text Widget Function
-# ------------------------------
-
-def create_scrollable_text(parent, height, width):
-    frame = tk.Frame(parent)
-    frame.pack(pady=10, fill=tk.BOTH, expand=True)
-
-    # Create a Text widget
-    text_widget = tk.Text(frame, height=height, width=width, font=("Helvetica", 12))
-    text_widget.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-
-    # Create a scrollbar
-    scrollbar = tk.Scrollbar(frame, command=text_widget.yview)
-    scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-
-    # Configure the Text widget to use the scrollbar
-    text_widget.config(yscrollcommand=scrollbar.set)
-
-    return text_widget
-
 # Create scrollable input text widget with reduced width
 program_input = create_scrollable_text(root, height=7, width=80)  # Reduced width from 90 to 80
 

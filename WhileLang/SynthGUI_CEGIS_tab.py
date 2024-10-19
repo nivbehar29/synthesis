@@ -41,7 +41,9 @@ class CEGIS_Tab:
         self.state_list_box: tk.Listbox = None
         self.states = [] # List of states
         self.states_dict = {} # Dictionary of states, where the key is the state name and the value is the description of the state
-        self.state_description_box: tk.Text = None
+        self.state_description_box: tk.Text = None # Text box to show the description of the selected state
+        self.excluded_holes_list_box: tk.Listbox = None # Listbox to show the excluded holes combinations
+        self.current_holes_box: tk.Listbox = None # Listbox to show the current holes values
 
 cegis = CEGIS_Tab()
 
@@ -116,11 +118,11 @@ cegis.states_dict = {
     "State_1": ("Replace holes with variables", "Replace all occurrences of '??' with unique hole variables"),
     "State_2": ("Fill holes with zeroes", "Fills the program holes with zeros"),
     "State_3_1": ("Try to verify the program", "Try to verify the program"),
-    "State_3_2": ("Verification succeeded", "Verification succeeded, fill program with current holes"),
-    "State_3_3": ("Verification failed", "Verification failed, show counter example"),
+    "State_3_2": ("Verification succeeded", "Verification succeeded, fill the program with current holes and finish"),
+    "State_3_3": ("Verification failed", "Verification failed, show counter example and exclude current holes combination"),
     "State_4_1": ("Try to find new holes", "Try to find new holes"),
-    "State_4_2": ("Couldn't find new holes", "Couldn't find new holes"),
-    "State_5": ("New holes found", "New holes found, Fill program with the new holes")
+    "State_4_2": ("Couldn't find new holes", "Couldn't find new holes - finish"),
+    "State_5": ("New holes found", "New holes found, Fill the program with the new holes")
 }
 
 def update_state_description(event, tab: CEGIS_Tab):
@@ -135,12 +137,38 @@ def update_state_description(event, tab: CEGIS_Tab):
     tab.state_description_box.delete(1.0, tk.END)  # Clear previous text
     tab.state_description_box.insert(tk.END, description)
 
+def replace_listbox_items_dict(listbox: tk.Listbox, dic : dict):
+    # Delete all of the previous items
+    listbox.delete(0, tk.END)
+    
+    # Add the new items to the listbox
+    for key, value in dic.items():
+        listbox.insert(tk.END, f"{key}: {value}")
+
 def next_step(tab: CEGIS_Tab, to_disable_prints = True):
 
     # Here, perform the last step that was actually done
     last_state = tab.last_step[0]
 
+    if last_state == "State_3_3":
+        excluded_holes_dict = tab.last_step[3]
+        
+        # Add the excluded holes to the listbox
+        tab.excluded_holes_list_box.insert(tk.END, str(tab.excluded_holes_list_box.size() + 1) + ". " + str(excluded_holes_dict))
 
+        counter_example = tab.last_step[2]
+        # TODO: Display the counter example in the output text box
+
+    elif last_state == "State_2":
+        new_holes_dict = tab.last_step[3]
+        replace_listbox_items_dict(tab.current_holes_box, new_holes_dict)
+
+    elif last_state == "State_5":
+        new_holes_dict = tab.last_step[3]
+        replace_listbox_items_dict(tab.current_holes_box, new_holes_dict)
+
+        filled_program = tab.last_step[2]
+        # TODO: Display the filled program in the output text box
 
     # Now, perform the next step
 
@@ -195,18 +223,19 @@ def create_interactive_window(tab: CEGIS_Tab, program, P, Q, linv):
     # Create states window
     state_list_box_label = tk.Label(tab.interactive_window, text="States:", font=("Helvetica", 12))
     state_list_box_label.place(x = 20, y=40)
+    state_list_box_label.update_idletasks()
 
+    # Create a listbox for the states. the listbox width will be the length of the longest string
     concatenated_strings = [f"{key}: {value[0]}" for key, value in cegis.states_dict.items()]
-    longest_string = max(concatenated_strings, key=len)
-    longest_string_len = len(longest_string)
-    print("longest_string:", longest_string)
-    print("longest_string_len:", longest_string_len)
+    longest_string_len = len(max(concatenated_strings, key=len))
     tab.state_list_box = tk.Listbox(tab.interactive_window, height=len(tab.states), width = longest_string_len)
-    tab.state_list_box.place(x = 20, y=65)
+    tab.state_list_box.place(x = 20, y = state_list_box_label.winfo_y() + 25)
 
+    # Insert the states into the listbox
     for state in tab.states:
         tab.state_list_box.insert(tk.END, state + " - " + tab.states_dict[state][0])
 
+    # nessesary to update the listbox width, so we can use it in the next lines
     tab.state_list_box.update_idletasks()
 
     # Create selected state description
@@ -216,7 +245,11 @@ def create_interactive_window(tab: CEGIS_Tab, program, P, Q, linv):
     tab.state_description_box = tk.Text(tab.interactive_window, height=len(tab.states), width=30, wrap=tk.WORD)
     tab.state_description_box.place(x = tab.state_list_box.winfo_width() + tab.state_list_box.winfo_x(), y=tab.state_list_box.winfo_y())
 
+    # Bind the listbox to the update_state_description function, so that the description is updated when a state is selected by the user
     tab.state_list_box.bind('<<ListboxSelect>>', lambda event: update_state_description(event, tab))  # Prevent selection with mouse clicks
+
+    # nessesary to update the describtion box width, so we can use it in the next lines
+    tab.state_description_box.update_idletasks()
 
     # Prevent the user from manually selecting items
     # def disable_selection(event):
@@ -226,10 +259,34 @@ def create_interactive_window(tab: CEGIS_Tab, program, P, Q, linv):
     # tab.state_list_box.bind("<B1-Motion>", disable_selection)       # Prevent selection by dragging
     # tab.state_list_box.bind("<ButtonRelease-1>", disable_selection) # Prevent selection when releasing mouse button
 
+    # initialize the selected state in the listbox
     highlight_state(tab.state_list_box, 0, 0)
     tab.last_step = (tab.states[0], tab.states_dict[tab.states[0]][1])
-    
-    
+
+    # Create a label for excluded holes box
+    excluded_holes_label = tk.Label(tab.interactive_window, text="Excluded holes combinations:", font=("Helvetica", 12))
+    excluded_holes_label.place(x = 20 + tab.state_description_box.winfo_width() + tab.state_description_box.winfo_x(), y=state_list_box_label.winfo_y())
+
+    # Create a listbox for excluded holes
+    state_list_box_x = 20 + tab.state_description_box.winfo_width() + tab.state_description_box.winfo_x()
+    state_list_box_y = tab.state_description_box.winfo_y()
+    state_list_box_height = tab.state_list_box.winfo_height()
+    tab.excluded_holes_list_box = create_scrollable_listbox(tab.interactive_window, state_list_box_x, state_list_box_y, state_list_box_height, 300)
+
+    # nessesary to update the excluded holes box width, so we can use it in the next lines
+    tab.excluded_holes_list_box.update_idletasks()
+
+    # Create a label for the current holes box
+    current_holes_label = tk.Label(tab.interactive_window, text="Current holes values:", font=("Helvetica", 12))
+    current_holes_label.place(x = 20 + tab.excluded_holes_list_box.winfo_width() + tab.excluded_holes_list_box.winfo_x(), y=state_list_box_label.winfo_y())
+
+    # Create a listbox for current holes
+    current_holes_box_x = 20 + tab.excluded_holes_list_box.winfo_width() + tab.excluded_holes_list_box.winfo_x()
+    current_holes_box_y = tab.excluded_holes_list_box.winfo_y()
+    current_holes_box_height = tab.excluded_holes_list_box.winfo_height()
+    tab.current_holes_box = create_scrollable_listbox(tab.interactive_window, current_holes_box_x, current_holes_box_y, current_holes_box_height, 200)
+
+
 
 
     tab.synth = Synthesizer(program)

@@ -455,9 +455,7 @@ class Synthesizer:
         # First, we fill the program holes with zeros
         filled_program, filled_holes_dict = self.fill_holes_with_zeros(program_holes_unrolled, holes)
 
-
-        yield ("State_2", "Fill holes with zeroes", filled_program)
-
+        yield ("State_2", "Fill holes with zeroes", filled_program, filled_holes_dict)
 
         # Initialize the final holes predicate
         final_holes_p = lambda d: True
@@ -493,21 +491,11 @@ class Synthesizer:
                 print("No counter example found - each input is a counter example")
                 # ce = {'x': 0}
 
-            yield ("State_3_3", "Verification failed, show counter example", ce)
+            yield ("State_3_3", "Verification failed, show counter example", ce, filled_holes_dict)
 
             print("counter example dict:", ce)
 
             del solver
-
-            # This is dumb - Z3 has a bug when it gives a counter example with inputs which are not equal to inputs we assign in P
-            # Or am I dumb? - I need to check this
-            # For the time being, I will assign the inputs manually to the beginning of the program
-            # inputs_p = lambda d: True
-            # for input_key in ce:
-            #     print("add input key:", input_key, "=", ce[input_key])
-            #     input_p = lambda d: d[input_key] == ce[input_key]
-            #     prev_inputs_p = copy.deepcopy(inputs_p)
-            #     inputs_p = lambda d, p = prev_inputs_p, q = input_p: And(p(d), q(d))
 
             inputs_code = ""
             for input_key in ce:
@@ -567,13 +555,8 @@ class Synthesizer:
             print("new filled program:")
             print(filled_program)
 
-            yield ("State_5", "New holes found, Fill program with the new holes", True, filled_program)
+            yield ("State_5", "New holes found, Fill program with the new holes", filled_program, filled_holes_dict)
 
-
-
-        yield "cegis_interactive: 3rd yield"
-
-        # raise StopIteration("cegis_interactive finished")
 
     def synth_program(self, orig_program, P, Q, linv = None, unroll_limit = 10):
 
