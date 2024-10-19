@@ -271,7 +271,7 @@ def holes_no_sol_case_3():
     expected_program = ""
     expected_error = Synthesizer.ProgramNotVerified
 
-    return test_synth_program(program, P, Q, linv, expected_program, expected_error, disable_prints)
+    return test_synth_program(program, P, Q, linv, expected_program, expected_error, False)
 
 # def holes_while_case_1():
 #     program = "t := ?? ; if x < t then x := 0 else x := 1 ; assert x = 0"
@@ -409,7 +409,7 @@ def assert_tests():
     holes_no_sol_cases = [
         holes_no_sol_case_1,
         holes_no_sol_case_2,
-        # holes_no_sol_case_3, TODO: fix this test
+        # holes_no_sol_case_3, #TODO: fix this test
     ]
 
     holes_while_cases = [

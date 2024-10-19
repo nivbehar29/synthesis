@@ -456,6 +456,8 @@ class Synthesizer:
         # First, we fill the program holes with zeros
         filled_program_unrolled, filled_holes_dict = self.fill_holes_with_zeros(program_holes_unrolled, holes)
 
+        prev_filled_holes_dict = copy.deepcopy(filled_holes_dict)
+
         filled_program, _ = self.fill_holes_with_zeros(holes_program, holes)
 
         yield ("State_2", "Fill holes with zeroes", filled_program, filled_holes_dict)
@@ -466,85 +468,117 @@ class Synthesizer:
         # Initialize holes dictionary
         new_holes_dict = {}
 
+        # Add bounderies for holes exploration
+        curr_lower_bound = 0
+        curr_upper_bound = 0
+        holes_bound_p = self.get_bounds_condition(holes, curr_lower_bound, curr_upper_bound)
+
         # initialize iteration counter
         k = 0
         while(True):
-            k += 1
-            print("\n*******************************************\n")
-            ast_filled = parse(filled_program_unrolled)
-            result, solver = verify(P, ast_filled, Q, linv=linv)
+            skip = True
+            if(k == 0 or prev_filled_holes_dict != filled_holes_dict):
+                skip = False
+                
+            if(skip == False):
+                k += 1
+                print("\n*******************************************\n")
+                ast_filled = parse(filled_program_unrolled)
+                result, solver = verify(P, ast_filled, Q, linv=linv)
 
-            yield ("State_3_1", "Try to verify the program", result, solver)
+                yield ("State_3_1", "Try to verify the program", result, solver)
 
-            if result == True:
-                filled_program_final = self.fill_holes_dict(holes_program, new_holes_dict)
-                holes_to_fill_with_zeroes = [key for key in holes if key not in new_holes_dict.keys()]
-                filled_program_final, _ = self.fill_holes_with_zeros(filled_program_final, holes_to_fill_with_zeroes)
+                if result == True:
+                    filled_program_final = self.fill_holes_dict(holes_program, new_holes_dict)
+                    holes_to_fill_with_zeroes = [key for key in holes if key not in new_holes_dict.keys()]
+                    filled_program_final, _ = self.fill_holes_with_zeros(filled_program_final, holes_to_fill_with_zeroes)
 
-                yield ("State_3_2", "Verification succeeded, fill program with current holes", filled_program_final)
+                    yield ("State_3_2", "Verification succeeded, fill program with current holes", filled_program_final)
 
-                return filled_program_final          
-            
-            ce = self.extract_counter_example_from_dict(extract_model_assignments(solver))
-            if ce == {}:
-                print("No counter example found - each input is a counter example")
-                # ce = {'x': 0}
+                    return filled_program_final          
+                
+                ce = self.extract_counter_example_from_dict(extract_model_assignments(solver))
+                if ce == {}:
+                    print("No counter example found - each input is a counter example")
+                    # ce = {'x': 0}
 
-            yield ("State_3_3", "Verification failed, show counter example", ce, filled_holes_dict)
+                yield ("State_3_3", "Verification failed, show counter example", ce, filled_holes_dict)
 
-            print("counter example dict:", ce)
+                print("counter example dict:", ce)
 
-            del solver
+                del solver
 
-            inputs_code = ""
-            for input_key in ce:
-                print("add input key:", input_key, ":=", ce[input_key])
-                inputs_code += f"{input_key} := {ce[input_key]} ; "
+                inputs_code = ""
+                for input_key in ce:
+                    print("add input key:", input_key, ":=", ce[input_key])
+                    inputs_code += f"{input_key} := {ce[input_key]} ; "
 
-            holes_program_with_inputs = inputs_code + program_holes_unrolled
-            ast_holes_inputs = parse(holes_program_with_inputs)
+                holes_program_with_inputs = inputs_code + program_holes_unrolled
+                ast_holes_inputs = parse(holes_program_with_inputs)
 
-            holes_p = lambda d: True
-            for hole_key in filled_holes_dict:
-                print("excluded hole key:", hole_key, "!=", filled_holes_dict[hole_key])
-                hole_p = lambda d: d[hole_key] == filled_holes_dict[hole_key]
-                prev_holes_p = copy.deepcopy(holes_p)
-                holes_p = lambda d, p = prev_holes_p, q = hole_p: And(p(d), q(d))
+                holes_p = lambda d: True
+                for hole_key in filled_holes_dict:
+                    val = filled_holes_dict[hole_key]
+                    print("excluded hole key:", hole_key, "!=", val)
+                    hole_p = lambda d, key = hole_key, value = val: d[key] == value
+                    holes_p = lambda d, p = copy.deepcopy(holes_p), q = copy.deepcopy(hole_p): And(p(d), q(d))
 
-            prev_final_holes_p = copy.deepcopy(final_holes_p)
-            final_holes_p = lambda d, p = prev_final_holes_p, q = holes_p: And(p(d), Not(q(d)))
+                final_holes_p = lambda d, p = copy.deepcopy(final_holes_p), q = holes_p: And(p(d), Not(q(d)))
 
-            # final_P = lambda d, p = P, q = inputs_p, h = final_holes_p: And(p(d), h(d), q(d))
-            final_P = lambda d, p = P, h = final_holes_p: And(p(d), h(d))
+            final_P = lambda d, p = copy.deepcopy(P), h = copy.deepcopy(final_holes_p), q = copy.deepcopy(holes_bound_p): And(p(d), h(d), q(d))
+            final_P_no_bounds = lambda d, p = copy.deepcopy(P), h = copy.deepcopy(final_holes_p): And(p(d), h(d))
+
+            # First, try to solve without holes bounds, to see if there is no solution at all.
+            if(skip == False):
+                print("Finding holes without bounds")
+                result, solver1 = self.find_holes(ast_holes_inputs, final_P_no_bounds, Q, linv=linv)
+                if result == False:
+                    print("The program can't be verified for all possible inputs")
+                    print("num of iterations:", k)
+                    yield ("State_4_2", "Couldn't find new holes", False)
+
+                print("There is a solution, now try to find holes with bounds")
+
+                del solver1
 
 
             print("Finding holes")
 
-            yield ("State_4_1", "Try to find new holes")
-            result, solver = self.find_holes(ast_holes_inputs, final_P, Q, linv=linv)
+            if(skip == False):
+                yield ("State_4_1", "Try to find new holes")
+            # Now, after we know there is a solution, we can try to find holes with bounds
+            result, solver2 = self.find_holes(ast_holes_inputs, final_P, Q, linv=linv)
             if result == False:
-                print("num of iterations:", k)
-                yield ("State_4_2", "Couldn't find new holes", False)
-                return
-            else:
-                print("holes:", solver.model())
+                # If we can't find holes with bounds, we need to increase the bounds.
+                print("No solution within current bounds - Increasing bounds")
+                curr_lower_bound = curr_lower_bound - 1
+                curr_upper_bound = curr_upper_bound + 1
+                print(f"new bounds: {curr_lower_bound}, {curr_upper_bound}")
+                # Update the holes bounds predicate
+                holes_bound_p = self.get_bounds_condition(holes, curr_lower_bound, curr_upper_bound)
+                prev_filled_holes_dict = copy.deepcopy(filled_holes_dict)
+                
+                continue  
+            
+            print("holes:", solver2.model())
             
 
 
-            new_holes_dict = self.extract_holes_from_dict(extract_model_assignments(solver))
+            new_holes_dict = self.extract_holes_from_dict(extract_model_assignments(solver2))
             print("new holes dict:", new_holes_dict)
 
-            if new_holes_dict == {}:
-                print("No new holes found")
-                print("num of iterations:", k)
-                yield ("State_4_2", "Couldn't find new holes", False)
-                return ""
+            # if new_holes_dict == {}:
+            #     print("No new holes found")
+            #     print("num of iterations:", k)
+            #     yield ("State_4_2", "Couldn't find new holes", False)
+            #     return ""
             
-            del solver
+            del solver2
             
             filled_program_unrolled = self.fill_holes_dict(program_holes_unrolled, new_holes_dict)
             holes_to_fill_with_zeroes = [key for key in holes if key not in new_holes_dict.keys()]
             filled_program_unrolled, holes_filled_with_zeroes_dict = self.fill_holes_with_zeros(filled_program_unrolled, holes_to_fill_with_zeroes)
+            prev_filled_holes_dict = copy.deepcopy(filled_holes_dict)
             filled_holes_dict = new_holes_dict
             filled_holes_dict.update(holes_filled_with_zeroes_dict)
 
@@ -587,50 +621,55 @@ class Synthesizer:
         # initialize iteration counter
         k = 0
         while(True):
-            k += 1
-            print("\n*******************************************\n")
-            ast_filled = parse(filled_program)
-            result, solver = verify(P, ast_filled, Q, linv=linv)
-            if result == True:
-                print("The program is verified")
-                filled_program_final = self.fill_holes_dict(holes_program, new_holes_dict)
-                holes_to_fill_with_zeroes = [key for key in holes if key not in new_holes_dict.keys()]
-                print("holes to fill with zeroes:", holes_to_fill_with_zeroes)
-                filled_program_final, _ = self.fill_holes_with_zeros(filled_program_final, holes_to_fill_with_zeroes)
-                print(f"final filled program: {filled_program_final}")
-                print("num of iterations:", k)
-                return filled_program_final          
-            
-            ce = self.extract_counter_example_from_dict(extract_model_assignments(solver))
-            if ce == {}:
-                print("No counter example found - each input is a counter example")
-                # ce = {'x': 0}
+            skip = True
+            if(k == 0 or prev_filled_holes_dict != filled_holes_dict):
+                skip = False
+                
+            if(skip == False):
+                k += 1
+                print("\n*******************************************\n")
+                ast_filled = parse(filled_program)
+                result, solver = verify(P, ast_filled, Q, linv=linv)
+                if result == True:
+                    print("The program is verified")
+                    filled_program_final = self.fill_holes_dict(holes_program, new_holes_dict)
+                    holes_to_fill_with_zeroes = [key for key in holes if key not in new_holes_dict.keys()]
+                    print("holes to fill with zeroes:", holes_to_fill_with_zeroes)
+                    filled_program_final, _ = self.fill_holes_with_zeros(filled_program_final, holes_to_fill_with_zeroes)
+                    print(f"final filled program: {filled_program_final}")
+                    print("num of iterations:", k)
+                    return filled_program_final          
+                
+                ce = self.extract_counter_example_from_dict(extract_model_assignments(solver))
+                if ce == {}:
+                    print("No counter example found - each input is a counter example")
+                    # ce = {'x': 0}
 
-            print("counter example dict:", ce)
+                print("counter example dict:", ce)
 
-            del solver
+                del solver
 
-            # This is dumb - Z3 has a bug when it gives a counter example with inputs which are not equal to inputs we assign in P
-            # Or am I dumb? - I need to check this
-            # For the time being, I will assign the inputs manually to the beginning of the program
-            # inputs_p = lambda d: True
-            # for input_key in ce:
-            #     print("add input key:", input_key, "=", ce[input_key])
-            #     input_p = lambda d: d[input_key] == ce[input_key]
-            #     prev_inputs_p = copy.deepcopy(inputs_p)
-            #     inputs_p = lambda d, p = prev_inputs_p, q = input_p: And(p(d), q(d))
+                # This is dumb - Z3 has a bug when it gives a counter example with inputs which are not equal to inputs we assign in P
+                # Or am I dumb? - I need to check this
+                # For the time being, I will assign the inputs manually to the beginning of the program
+                # inputs_p = lambda d: True
+                # for input_key in ce:
+                #     print("add input key:", input_key, "=", ce[input_key])
+                #     input_p = lambda d: d[input_key] == ce[input_key]
+                #     prev_inputs_p = copy.deepcopy(inputs_p)
+                #     inputs_p = lambda d, p = prev_inputs_p, q = input_p: And(p(d), q(d))
 
-            inputs_code = ""
-            for input_key in ce:
-                print("add input key:", input_key, ":=", ce[input_key])
-                inputs_code += f"{input_key} := {ce[input_key]} ; "
+                inputs_code = ""
+                for input_key in ce:
+                    print("add input key:", input_key, ":=", ce[input_key])
+                    inputs_code += f"{input_key} := {ce[input_key]} ; "
 
-            holes_program_with_inputs = inputs_code + program_holes_unrolled
-            ast_holes_inputs = parse(holes_program_with_inputs)
+                holes_program_with_inputs = inputs_code + program_holes_unrolled
+                ast_holes_inputs = parse(holes_program_with_inputs)
 
 
-            holes_p = lambda d: True
-            if(prev_filled_holes_dict != filled_holes_dict):
+                holes_p = lambda d: True
+                
                 print("filled_holes_dict:", filled_holes_dict)
                 for hole_key in filled_holes_dict:
                     val = filled_holes_dict[hole_key]
@@ -645,16 +684,17 @@ class Synthesizer:
             final_P_no_bounds = lambda d, p = copy.deepcopy(P), h = copy.deepcopy(final_holes_p): And(p(d), h(d))
 
             # First, try to solve without holes bounds, to see if there is no solution at all.
-            print("Finding holes without bounds")
-            result, solver1 = self.find_holes(ast_holes_inputs, final_P_no_bounds, Q, linv=linv)
-            if result == False:
-                print("The program can't be verified for all possible inputs")
-                print("num of iterations:", k)
-                raise self.ProgramNotVerified("The given program can't be verified for all possible inputs")
+            if(skip == False):
+                print("Finding holes without bounds")
+                result, solver1 = self.find_holes(ast_holes_inputs, final_P_no_bounds, Q, linv=linv)
+                if result == False:
+                    print("The program can't be verified for all possible inputs")
+                    print("num of iterations:", k)
+                    raise self.ProgramNotVerified("The given program can't be verified for all possible inputs")
 
-            print("There is a solution, now try to find holes with bounds")
+                print("There is a solution, now try to find holes with bounds")
 
-            del solver1
+                del solver1
 
             # Now, after we know there is a solution, we can try to find holes with bounds
             print("Finding holes with bounds")
@@ -668,6 +708,8 @@ class Synthesizer:
 
                 # Update the holes bounds predicate
                 holes_bound_p = self.get_bounds_condition(holes, curr_lower_bound, curr_upper_bound)
+
+                prev_filled_holes_dict = copy.deepcopy(filled_holes_dict)
                 continue
             
             print(f"\nsolver2 :\n{solver2}\n\n")
