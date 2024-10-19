@@ -507,12 +507,12 @@ class Synthesizer:
             holes_p = lambda d: True
             for hole_key in filled_holes_dict:
                 print("excluded hole key:", hole_key, "!=", filled_holes_dict[hole_key])
-                hole_p = lambda d: d[hole_key] != filled_holes_dict[hole_key]
+                hole_p = lambda d: d[hole_key] == filled_holes_dict[hole_key]
                 prev_holes_p = copy.deepcopy(holes_p)
                 holes_p = lambda d, p = prev_holes_p, q = hole_p: And(p(d), q(d))
 
             prev_final_holes_p = copy.deepcopy(final_holes_p)
-            final_holes_p = lambda d, p = prev_final_holes_p, q = holes_p: And(p(d), q(d))
+            final_holes_p = lambda d, p = prev_final_holes_p, q = holes_p: And(p(d), Not(q(d)))
 
             # final_P = lambda d, p = P, q = inputs_p, h = final_holes_p: And(p(d), h(d), q(d))
             final_P = lambda d, p = P, h = final_holes_p: And(p(d), h(d))
@@ -555,6 +555,14 @@ class Synthesizer:
             yield ("State_5", "New holes found, Fill program with the new holes", filled_program, filled_holes_dict)
 
 
+    def get_bounds_condition(self, holes, lower_bound, upper_bound):
+        final_holes_bound_p = lambda d : True
+        for hole_key in holes:
+            hole_bound_p = lambda d: And(d[hole_key] >= lower_bound, d[hole_key] <= upper_bound)
+            final_holes_bound_p = lambda d, p = copy.deepcopy(final_holes_bound_p), q = copy.deepcopy(hole_bound_p): And(p(d), q(d))
+
+        return final_holes_bound_p
+
     def synth_program(self, orig_program, P, Q, linv = None, unroll_limit = 10):
 
         # Checks if the given program can be parsed, have holes, and variables names are valid
@@ -563,12 +571,18 @@ class Synthesizer:
 
         # First, we fill the program holes with zeros
         filled_program, filled_holes_dict = self.fill_holes_with_zeros(program_holes_unrolled, holes)
+        prev_filled_holes_dict = copy.deepcopy(filled_holes_dict)
 
         # Initialize the final holes predicate
         final_holes_p = lambda d: True
 
         # Initialize holes dictionary
         new_holes_dict = {}
+
+        # Add bounderies for holes exploration
+        curr_lower_bound = 0
+        curr_upper_bound = 0
+        holes_bound_p = self.get_bounds_condition(holes, curr_lower_bound, curr_upper_bound)
 
         # initialize iteration counter
         k = 0
@@ -614,36 +628,60 @@ class Synthesizer:
             holes_program_with_inputs = inputs_code + program_holes_unrolled
             ast_holes_inputs = parse(holes_program_with_inputs)
 
+
             holes_p = lambda d: True
-            for hole_key in filled_holes_dict:
-                print("excluded hole key:", hole_key, "!=", filled_holes_dict[hole_key])
-                hole_p = lambda d: d[hole_key] != filled_holes_dict[hole_key]
-                prev_holes_p = copy.deepcopy(holes_p)
-                holes_p = lambda d, p = prev_holes_p, q = hole_p: And(p(d), q(d))
+            if(prev_filled_holes_dict != filled_holes_dict):
+                print("filled_holes_dict:", filled_holes_dict)
+                for hole_key in filled_holes_dict:
+                    val = filled_holes_dict[hole_key]
+                    print("excluded hole key:", hole_key, "!=", val)
+                    hole_p = lambda d, key = hole_key, value = val: d[key] == value
+                    holes_p = lambda d, p = copy.deepcopy(holes_p), q = copy.deepcopy(hole_p): And(p(d), q(d))
 
-            prev_final_holes_p = copy.deepcopy(final_holes_p)
-            final_holes_p = lambda d, p = prev_final_holes_p, q = holes_p: And(p(d), q(d))
+                final_holes_p = lambda d, p = copy.deepcopy(final_holes_p), q = copy.deepcopy(holes_p): And(p(d), Not(q(d)))
 
-            # final_P = lambda d, p = P, q = inputs_p, h = final_holes_p: And(p(d), h(d), q(d))
-            final_P = lambda d, p = P, h = final_holes_p: And(p(d), h(d))
+            # set the final P. also add the holes bounds to it
+            final_P = lambda d, p = copy.deepcopy(P), h = copy.deepcopy(final_holes_p), q = copy.deepcopy(holes_bound_p): And(p(d), h(d), q(d))
+            final_P_no_bounds = lambda d, p = copy.deepcopy(P), h = copy.deepcopy(final_holes_p): And(p(d), h(d))
 
-            print("Finding holes")
-            result, solver = self.find_holes(ast_holes_inputs, final_P, Q, linv=linv)
+            # First, try to solve without holes bounds, to see if there is no solution at all.
+            print("Finding holes without bounds")
+            result, solver1 = self.find_holes(ast_holes_inputs, final_P_no_bounds, Q, linv=linv)
             if result == False:
+                print("The program can't be verified for all possible inputs")
                 print("num of iterations:", k)
                 raise self.ProgramNotVerified("The given program can't be verified for all possible inputs")
-            else:
-                print("holes:", solver.model())
+
+            print("There is a solution, now try to find holes with bounds")
+
+            del solver1
+
+            # Now, after we know there is a solution, we can try to find holes with bounds
+            print("Finding holes with bounds")
+            result, solver2 = self.find_holes(ast_holes_inputs, final_P, Q, linv=linv)
+            if result == False:
+                # If we can't find holes with bounds, we need to increase the bounds.
+                print("No solution within current bounds - Increasing bounds")
+                curr_lower_bound = curr_lower_bound - 20
+                curr_upper_bound = curr_upper_bound + 20
+                print(f"new bounds: {curr_lower_bound}, {curr_upper_bound}")
+
+                # Update the holes bounds predicate
+                holes_bound_p = self.get_bounds_condition(holes, curr_lower_bound, curr_upper_bound)
+                continue
             
-            new_holes_dict = self.extract_holes_from_dict(extract_model_assignments(solver))
+            print(f"\nsolver2 :\n{solver2}\n\n")
+            print("holes:", solver2.model())
+            
+            new_holes_dict = self.extract_holes_from_dict(extract_model_assignments(solver2))
             print("new holes dict:", new_holes_dict)
 
-            if new_holes_dict == {}:
-                print("No new holes found")
-                print("num of iterations:", k)
-                return ""
+            # if new_holes_dict == {}:
+            #     print("No new holes found")
+            #     print("num of iterations:", k)
+            #     return ""
             
-            del solver
+            del solver2
             
             filled_program = self.fill_holes_dict(program_holes_unrolled, new_holes_dict)
             holes_to_fill_with_zeroes = [key for key in holes if key not in new_holes_dict.keys()]
@@ -651,6 +689,7 @@ class Synthesizer:
             filled_program, holes_filled_with_zeroes_dict = self.fill_holes_with_zeros(filled_program, holes_to_fill_with_zeroes)
             print("new_holes_dict:", new_holes_dict)
             print("holes_filled_with_zeroes_dict:", holes_filled_with_zeroes_dict)
+            prev_filled_holes_dict = copy.deepcopy(filled_holes_dict)
             filled_holes_dict = new_holes_dict
             filled_holes_dict.update(holes_filled_with_zeroes_dict)
             print("filled_holes_dict:", filled_holes_dict)
