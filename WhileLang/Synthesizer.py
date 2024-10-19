@@ -436,7 +436,8 @@ class Synthesizer:
         # is_there_valid_input, solver_valid = is_exist_input_to_satisfy(P, ast_holes_unrolled, Q, linv)
         # print("is_there_valid_input: ", is_there_valid_input)
         # if(is_there_valid_input == False):
-        #     raise self.NoInputToSatisfyProgram("The given program has no input which can satisfy the conditions")
+        #     pass
+        #     # raise self.NoInputToSatisfyProgram("The given program has no input which can satisfy the conditions")
         # if solver_valid != None:
         #     del solver_valid
         
@@ -447,13 +448,15 @@ class Synthesizer:
 
         holes, holes_program, program_holes_unrolled, P, Q, linv = self.cegis_init_checks(orig_program, P, Q, linv, unroll_limit)
 
-        yield ("State_0", "Wait for initialization")
+        yield ("State_0", "Wait for initialization", orig_program)
 
 
-        yield ("State_1", "Replace holes with variables", program_holes_unrolled)
+        yield ("State_1", "Replace holes with variables", holes_program)
 
         # First, we fill the program holes with zeros
-        filled_program, filled_holes_dict = self.fill_holes_with_zeros(program_holes_unrolled, holes)
+        filled_program_unrolled, filled_holes_dict = self.fill_holes_with_zeros(program_holes_unrolled, holes)
+
+        filled_program, _ = self.fill_holes_with_zeros(holes_program, holes)
 
         yield ("State_2", "Fill holes with zeroes", filled_program, filled_holes_dict)
 
@@ -468,19 +471,15 @@ class Synthesizer:
         while(True):
             k += 1
             print("\n*******************************************\n")
-            ast_filled = parse(filled_program)
+            ast_filled = parse(filled_program_unrolled)
             result, solver = verify(P, ast_filled, Q, linv=linv)
 
             yield ("State_3_1", "Try to verify the program", result, solver)
 
             if result == True:
-                print("The program is verified")
                 filled_program_final = self.fill_holes_dict(holes_program, new_holes_dict)
                 holes_to_fill_with_zeroes = [key for key in holes if key not in new_holes_dict.keys()]
-                print("holes to fill with zeroes:", holes_to_fill_with_zeroes)
                 filled_program_final, _ = self.fill_holes_with_zeros(filled_program_final, holes_to_fill_with_zeroes)
-                print(f"final filled program: {filled_program_final}")
-                print("num of iterations:", k)
 
                 yield ("State_3_2", "Verification succeeded, fill program with current holes", filled_program_final)
 
@@ -543,17 +542,15 @@ class Synthesizer:
             
             del solver
             
-            filled_program = self.fill_holes_dict(program_holes_unrolled, new_holes_dict)
+            filled_program_unrolled = self.fill_holes_dict(program_holes_unrolled, new_holes_dict)
             holes_to_fill_with_zeroes = [key for key in holes if key not in new_holes_dict.keys()]
-            print("holes to fill with zeroes:", holes_to_fill_with_zeroes)
-            filled_program, holes_filled_with_zeroes_dict = self.fill_holes_with_zeros(filled_program, holes_to_fill_with_zeroes)
-            print("new_holes_dict:", new_holes_dict)
-            print("holes_filled_with_zeroes_dict:", holes_filled_with_zeroes_dict)
+            filled_program_unrolled, holes_filled_with_zeroes_dict = self.fill_holes_with_zeros(filled_program_unrolled, holes_to_fill_with_zeroes)
             filled_holes_dict = new_holes_dict
             filled_holes_dict.update(holes_filled_with_zeroes_dict)
-            print("filled_holes_dict:", filled_holes_dict)
-            print("new filled program:")
-            print(filled_program)
+
+            # Only for the visualization (interactive CEGIS)
+            filled_program = self.fill_holes_dict(holes_program, new_holes_dict)
+            filled_program, _ = self.fill_holes_with_zeros(filled_program, holes_to_fill_with_zeroes)
 
             yield ("State_5", "New holes found, Fill program with the new holes", filled_program, filled_holes_dict)
 

@@ -275,7 +275,7 @@ def open_conditions_window(tab):
 # ------------------------------
 
 # Scrollable Text Widget Function
-def create_scrollable_text(parent, height, width, x = None, y = None):
+def create_scrollable_text(parent, height, width, x = None, y = None, wrap = "char"):
     frame = tk.Frame(parent)
 
     if x != None and y != None:
@@ -284,7 +284,7 @@ def create_scrollable_text(parent, height, width, x = None, y = None):
         frame.pack(pady=10, fill=tk.BOTH, expand=True)
 
     # Create a Text widget
-    text_widget = tk.Text(frame, height=height, width=width, font=("Helvetica", 12))
+    text_widget = tk.Text(frame, height=height, width=width, font=("Helvetica", 12), wrap=wrap)
     text_widget.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
     # Create a scrollbar
@@ -332,7 +332,7 @@ def eval_conditions(P_str, Q_str, linv_str):
     return P, Q, linv
 
 # Function to flash a text widget
-def flash_text_widget(text_widget, original_color, flash_color="yellow", flash_duration=200):
+def flash_text_widget(text_widget, original_color, flash_color="yellow", flash_duration=500):
     # Change to the flash color
     text_widget.config(bg=flash_color)
 
@@ -352,3 +352,7 @@ def set_disabled_window_text_flash(window: tk.Text, text: str, error = False):
     else:
         flash_color = 'lightgreen'
     flash_text_widget(window, 'lightgray', flash_color)  # Flash the text widget to indicate the change
+
+def set_disabled_window_text_flash_2(window: tk.Text, text: str, flash_color, original_background_color):
+    set_disabled_window_text(window, text)  # Display the text
+    flash_text_widget(window, original_background_color, flash_color)  # Flash the text widget to indicate the change

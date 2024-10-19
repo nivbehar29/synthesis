@@ -45,6 +45,14 @@ class CEGIS_Tab:
         self.excluded_holes_list_box: tk.Listbox = None # Listbox to show the excluded holes combinations
         self.current_holes_box: tk.Listbox = None # Listbox to show the current holes values
 
+        self.next_button: tk.Button = None # Button to go to the next step
+        self.abort_button: tk.Button = None # Button to abort the interactive process
+
+        self.current_program_text_box: tk.Text = None # Text box to show the current program
+        self.holes_program_text_box: tk.Text = None # Text box to show the holes program
+
+        self.interactive_message_text: tk.Text = None # Text box to show the messages
+
 cegis = CEGIS_Tab()
 
 def synth_program_cegis(program, P, Q, linv, debug=False, unroll_limit=10):
@@ -116,14 +124,22 @@ cegis.states = [
 cegis.states_dict = {
     "State_0": ("initialization", "Initialize the program"),
     "State_1": ("Replace holes with variables", "Replace all occurrences of '??' with unique hole variables"),
-    "State_2": ("Fill holes with zeroes", "Fills the program holes with zeros"),
+    "State_2": ("Fill holes with zeroes", "Fill the program holes with zeros"),
     "State_3_1": ("Try to verify the program", "Try to verify the program"),
-    "State_3_2": ("Verification succeeded", "Verification succeeded, fill the program with current holes and finish"),
+    "State_3_2": ("Verification succeeded", "Verification succeeded, return the final program"),
     "State_3_3": ("Verification failed", "Verification failed, show counter example and exclude current holes combination"),
     "State_4_1": ("Try to find new holes", "Try to find new holes"),
     "State_4_2": ("Couldn't find new holes", "Couldn't find new holes - finish"),
-    "State_5": ("New holes found", "New holes found, Fill the program with the new holes")
+    "State_5": ("New holes found", "New holes found, Show the new holes and fill the program with the new holes")
 }
+
+def finish_interactive_process(tab: CEGIS_Tab):
+    # Kill generator
+    tab.generator.close()
+
+    # Disable the next / Abort buttons
+    tab.next_button.config(state='disabled')
+    tab.abort_button.config(state='disabled')
 
 def update_state_description(event, tab: CEGIS_Tab):
     selected_index = tab.state_list_box.curselection()
@@ -133,9 +149,15 @@ def update_state_description(event, tab: CEGIS_Tab):
     
     description = tab.states_dict[tab.states[selected_index[0]]][1]
 
+    # Enable the description box
+    tab.state_description_box.config(state='normal')
+
     # Update the text box with the corresponding description
     tab.state_description_box.delete(1.0, tk.END)  # Clear previous text
     tab.state_description_box.insert(tk.END, description)
+
+    # Disable the description box
+    tab.state_description_box.config(state='disabled')
 
 def replace_listbox_items_dict(listbox: tk.Listbox, dic : dict):
     # Delete all of the previous items
@@ -150,25 +172,64 @@ def next_step(tab: CEGIS_Tab, to_disable_prints = True):
     # Here, perform the last step that was actually done
     last_state = tab.last_step[0]
 
-    if last_state == "State_3_3":
+    if last_state == "State_0":
+        if len(tab.last_step) >= 3:
+            program = tab.last_step[2]
+            set_disabled_window_text_flash_2(tab.current_program_text_box, program, 'yellow', 'white')
+
+    if last_state == "State_1":
+        program_with_holes = tab.last_step[2]
+        set_disabled_window_text_flash_2(tab.holes_program_text_box, program_with_holes, 'yellow', 'white')
+    
+    elif last_state == "State_2":
+        new_holes_dict = tab.last_step[3]
+        replace_listbox_items_dict(tab.current_holes_box, new_holes_dict)
+        flash_text_widget(tab.current_holes_box, 'white', 'yellow')
+
+        program_with_zeros = tab.last_step[2]
+        set_disabled_window_text_flash_2(tab.current_program_text_box, program_with_zeros, 'yellow', 'white')
+
+
+    elif last_state == "State_3_1":
+        result = tab.last_step[2]
+        if result == True:
+            set_disabled_window_text_flash_2(tab.interactive_message_text, f"Verification secceeded. The synthesized program will be presented in the 'Current program' window", 'lightgreen', 'white')
+        else:
+            set_disabled_window_text_flash_2(tab.interactive_message_text, f"Verification failed", 'red2', 'white')
+
+
+    elif last_state == "State_3_2":
+        filled_program = tab.last_step[2]
+        set_disabled_window_text_flash_2(tab.current_program_text_box, filled_program, 'lightgreen', 'white')
+        finish_interactive_process(tab)
+
+    elif last_state == "State_3_3":
         excluded_holes_dict = tab.last_step[3]
         
         # Add the excluded holes to the listbox
         tab.excluded_holes_list_box.insert(tk.END, str(tab.excluded_holes_list_box.size() + 1) + ". " + str(excluded_holes_dict))
+        flash_text_widget(tab.excluded_holes_list_box, 'white', 'yellow')
 
+        # Scroll to the end of the listbox
+        tab.excluded_holes_list_box.see(tk.END)
+
+        # Set the counter example in the message box
         counter_example = tab.last_step[2]
-        # TODO: Display the counter example in the output text box
+        set_disabled_window_text_flash_2(tab.interactive_message_text, f"Counter example: {counter_example}", 'yellow', 'white')
 
-    elif last_state == "State_2":
-        new_holes_dict = tab.last_step[3]
-        replace_listbox_items_dict(tab.current_holes_box, new_holes_dict)
+    elif last_state == "State_4_2":
+        set_disabled_window_text_flash_2(tab.interactive_message_text, f"Couldn't find new holes - program is not solvable.\nFinish process.", 'red2', 'white')
+        finish_interactive_process(tab)
 
     elif last_state == "State_5":
         new_holes_dict = tab.last_step[3]
         replace_listbox_items_dict(tab.current_holes_box, new_holes_dict)
+        flash_text_widget(tab.current_holes_box, 'white', 'yellow')
 
         filled_program = tab.last_step[2]
-        # TODO: Display the filled program in the output text box
+        # Display the filled program in the output text box
+        set_disabled_window_text_flash_2(tab.current_program_text_box, filled_program, 'yellow', 'white')
+
 
     # Now, perform the next step
 
@@ -183,9 +244,17 @@ def next_step(tab: CEGIS_Tab, to_disable_prints = True):
 
         # Highlight the current state
         highlight_state(tab.state_list_box, tab.states.index(tab.last_step[0]), tab.states.index(last_state))
+        update_state_description(None, tab)
 
     except StopIteration:
         print("StopIteration has been raised")
+
+def abort(tab: CEGIS_Tab):
+    # Kill generator
+    tab.generator.close()
+
+    # Close the interactive window
+    tab.interactive_window.destroy()
 
 def highlight_state(state_list_box: tk.Listbox, index, prev_index):
     # Clear any previous selection
@@ -203,6 +272,144 @@ def highlight_state(state_list_box: tk.Listbox, index, prev_index):
     state_list_box.activate(index)
     state_list_box.itemconfig(index, {'bg': 'yellow', 'fg': 'black'})
 
+def create_info_frame(tab: CEGIS_Tab, pos_x, pos_y, width, height):
+    # Create a frame inside the window
+    info_frame = tk.Frame(tab.interactive_window, highlightbackground="black", highlightthickness=2) # for debugging the frame size
+    # info_frame = tk.Frame(tab.interactive_window)
+    info_frame.place(x=pos_x, y=pos_y, width=width, height=height)
+    info_frame.update_idletasks()
+
+    # Create states window
+    state_list_box_label = tk.Label(info_frame, text="States:", font=("Helvetica", 12))
+    state_list_box_label.place(x = 0, y=0)
+    state_list_box_label.update_idletasks()
+
+    # Create a listbox for the states. the listbox width will be the length of the longest string
+    concatenated_strings = [f"{key}: {value[0]}" for key, value in cegis.states_dict.items()]
+    longest_string_len = len(max(concatenated_strings, key=len))
+    tab.state_list_box = tk.Listbox(info_frame, height=len(tab.states), width = longest_string_len)
+    tab.state_list_box.place(x = 0, y = state_list_box_label.winfo_y() + 25)
+
+    # Insert the states into the listbox
+    for state in tab.states:
+        tab.state_list_box.insert(tk.END, state + " - " + tab.states_dict[state][0])
+
+    # nessesary to update the listbox width, so we can use it in the next lines
+    tab.state_list_box.update_idletasks()
+
+    # Create selected state description
+    states_description_label = tk.Label(info_frame, text="State description:", font=("Helvetica", 12))
+    states_description_label.place(x = tab.state_list_box.winfo_width() + tab.state_list_box.winfo_x(), y=state_list_box_label.winfo_y())
+
+    tab.state_description_box = tk.Text(info_frame, height=len(tab.states), width=30, wrap=tk.WORD)
+    tab.state_description_box.place(x = tab.state_list_box.winfo_width() + tab.state_list_box.winfo_x(), y=tab.state_list_box.winfo_y())
+
+    # Disable the description box
+    tab.state_description_box.config(state='disabled')
+
+    # Bind the listbox to the update_state_description function, so that the description is updated when a state is selected by the user
+    tab.state_list_box.bind('<<ListboxSelect>>', lambda event: update_state_description(event, tab))  # Prevent selection with mouse clicks
+
+    # nessesary to update the describtion box width, so we can use it in the next lines
+    tab.state_description_box.update_idletasks()
+
+    # Prevent the user from manually selecting items
+    # def disable_selection(event):
+    #     return "break"  # Prevents the default action
+    # tab.state_list_box.bind("<Button-1>", disable_selection)  # Prevent selection with mouse clicks
+    # tab.state_list_box.bind("<Key>", disable_selection)  # Prevent selection with keyboard
+    # tab.state_list_box.bind("<B1-Motion>", disable_selection)       # Prevent selection by dragging
+    # tab.state_list_box.bind("<ButtonRelease-1>", disable_selection) # Prevent selection when releasing mouse button
+
+    # Create a label for excluded holes box
+    excluded_holes_label = tk.Label(info_frame, text="Excluded holes combinations:", font=("Helvetica", 12))
+    excluded_holes_label.place(x = 20 + tab.state_description_box.winfo_width() + tab.state_description_box.winfo_x(), y=state_list_box_label.winfo_y())
+
+    # Create a listbox for excluded holes
+    state_list_box_x = 20 + tab.state_description_box.winfo_width() + tab.state_description_box.winfo_x()
+    state_list_box_y = tab.state_description_box.winfo_y()
+    state_list_box_height = tab.state_list_box.winfo_height()
+    tab.excluded_holes_list_box = create_scrollable_listbox(info_frame, state_list_box_x, state_list_box_y, state_list_box_height, 300)
+
+    # nessesary to update the excluded holes box width, so we can use it in the next lines
+    tab.excluded_holes_list_box.update_idletasks()
+
+    # Create a label for the current holes box
+    current_holes_label = tk.Label(info_frame, text="Current holes values:", font=("Helvetica", 12))
+    current_holes_label.place(x = 20 + tab.excluded_holes_list_box.winfo_width() + tab.excluded_holes_list_box.winfo_x(), y=state_list_box_label.winfo_y())
+
+    # Create a listbox for current holes
+    current_holes_box_x = 20 + tab.excluded_holes_list_box.winfo_width() + tab.excluded_holes_list_box.winfo_x()
+    current_holes_box_y = tab.excluded_holes_list_box.winfo_y()
+    current_holes_box_height = tab.excluded_holes_list_box.winfo_height()
+    tab.current_holes_box = create_scrollable_listbox(info_frame, current_holes_box_x, current_holes_box_y, current_holes_box_height, 200)
+
+def create_buttons_frame(tab: CEGIS_Tab, pos_x, pos_y, width, height):
+    # Create a frame inside the window
+    buttons_frame = tk.Frame(tab.interactive_window, highlightbackground="black", highlightthickness=2) # for debugging the frame size
+    # buttons_frame = tk.Frame(tab.interactive_window)
+    buttons_frame.place(x=pos_x, y=pos_y, width=width, height=height)
+    buttons_frame.update_idletasks()
+
+    # Create Next \ Abort buttons
+    tab.next_button = tk.Button(buttons_frame, text="Next step", command=lambda: next_step(cegis, True))
+    tab.next_button.place(x = 0, y=0)  # Set the position of the button (x, y)
+    tab.abort_button = tk.Button(buttons_frame, text="Abort", command=lambda: abort(cegis))
+    tab.abort_button.place(x = 100, y=0)  # Set the position of the button (x, y)
+
+def create_program_frame(tab: CEGIS_Tab, pos_x, pos_y, width, height):
+    # Create a frame inside the window
+    program_frame = tk.Frame(tab.interactive_window, highlightbackground="black", highlightthickness=2) # for debugging the frame size
+    # program_frame = tk.Frame(tab.interactive_window)
+    program_frame.place(x=pos_x, y=pos_y, width=width, height=height)
+    program_frame.update_idletasks()
+
+    # Create a label for the current program
+    program_label = tk.Label(program_frame, text="Current program:", font=("Helvetica", 12))
+    program_label.place(x = 0, y=0)
+    program_label.update_idletasks()
+
+    # Create a text box for the program
+    tab.current_program_text_box = tk.Text(program_frame, height=10, width=90, wrap=tk.WORD)
+    tab.current_program_text_box.place(x = 0, y=program_label.winfo_y() + 25)
+    tab.current_program_text_box.update_idletasks()
+
+    # Disable the text box
+    tab.current_program_text_box.config(state='disabled')
+
+    # Create a label for the holes program
+    holes_program_label = tk.Label(program_frame, text="Holes program:", font=("Helvetica", 12))
+    holes_program_label.place(x = 0, y=tab.current_program_text_box.winfo_y() + tab.current_program_text_box.winfo_height() + 10)
+    holes_program_label.update_idletasks()
+
+    # Create a text box for the holes program
+    tab.holes_program_text_box = tk.Text(program_frame, height=10, width=90, wrap=tk.WORD)
+    tab.holes_program_text_box.place(x = 0, y=holes_program_label.winfo_y() + 25)
+    tab.holes_program_text_box.update_idletasks()
+
+    # Disable the text box
+    tab.holes_program_text_box.config(state='disabled')
+
+def create_message_frame(tab: CEGIS_Tab, pos_x, pos_y, width, height):
+    # Create a frame inside the window
+    message_frame = tk.Frame(tab.interactive_window, highlightbackground="black", highlightthickness=2) # for debugging the frame size
+    # message_frame = tk.Frame(tab.interactive_window)
+    message_frame.place(x=pos_x, y=pos_y, width=width, height=height)
+    message_frame.update_idletasks()
+
+    # Create a label for the message
+    message_label = tk.Label(message_frame, text="Messages:", font=("Helvetica", 12))
+    message_label.place(x = 0, y = 0)
+    message_label.update_idletasks()
+
+    # Create a text box for the message
+    tab.interactive_message_text = create_scrollable_text(message_frame, 7, 40, 0, message_label.winfo_y() + 25, tk.WORD)
+    # tab.interactive_message_text.place(x = 0, y = message_label.winfo_y() + 25)
+    tab.interactive_message_text.update_idletasks()
+
+    # Disable the text box
+    tab.interactive_message_text.config(state='disabled')
+
 # Initializes the Interactive window
 def create_interactive_window(tab: CEGIS_Tab, program, P, Q, linv):
     # Check if the window is already open
@@ -219,82 +426,28 @@ def create_interactive_window(tab: CEGIS_Tab, program, P, Q, linv):
     window_label = tk.Label(tab.interactive_window, text="Interactive CEGIS", font=("Helvetica", 14))
     window_label.pack(pady=10)
 
+    # Create a frame inside the window, to show the information
+    create_info_frame(tab, 20, 40, 1050, 200)
 
-    # Create states window
-    state_list_box_label = tk.Label(tab.interactive_window, text="States:", font=("Helvetica", 12))
-    state_list_box_label.place(x = 20, y=40)
-    state_list_box_label.update_idletasks()
+    # Create a frame inside the window, to show the buttons
+    create_buttons_frame(tab, 400, 250, 145, 30)
 
-    # Create a listbox for the states. the listbox width will be the length of the longest string
-    concatenated_strings = [f"{key}: {value[0]}" for key, value in cegis.states_dict.items()]
-    longest_string_len = len(max(concatenated_strings, key=len))
-    tab.state_list_box = tk.Listbox(tab.interactive_window, height=len(tab.states), width = longest_string_len)
-    tab.state_list_box.place(x = 20, y = state_list_box_label.winfo_y() + 25)
+    # Create a frame inside the window, to show the program
+    create_program_frame(tab, 20, 300, 740, 400)
 
-    # Insert the states into the listbox
-    for state in tab.states:
-        tab.state_list_box.insert(tk.END, state + " - " + tab.states_dict[state][0])
-
-    # nessesary to update the listbox width, so we can use it in the next lines
-    tab.state_list_box.update_idletasks()
-
-    # Create selected state description
-    states_description_label = tk.Label(tab.interactive_window, text="State description:", font=("Helvetica", 12))
-    states_description_label.place(x = tab.state_list_box.winfo_width() + tab.state_list_box.winfo_x(), y=state_list_box_label.winfo_y())
-
-    tab.state_description_box = tk.Text(tab.interactive_window, height=len(tab.states), width=30, wrap=tk.WORD)
-    tab.state_description_box.place(x = tab.state_list_box.winfo_width() + tab.state_list_box.winfo_x(), y=tab.state_list_box.winfo_y())
-
-    # Bind the listbox to the update_state_description function, so that the description is updated when a state is selected by the user
-    tab.state_list_box.bind('<<ListboxSelect>>', lambda event: update_state_description(event, tab))  # Prevent selection with mouse clicks
-
-    # nessesary to update the describtion box width, so we can use it in the next lines
-    tab.state_description_box.update_idletasks()
-
-    # Prevent the user from manually selecting items
-    # def disable_selection(event):
-    #     return "break"  # Prevents the default action
-    # tab.state_list_box.bind("<Button-1>", disable_selection)  # Prevent selection with mouse clicks
-    # tab.state_list_box.bind("<Key>", disable_selection)  # Prevent selection with keyboard
-    # tab.state_list_box.bind("<B1-Motion>", disable_selection)       # Prevent selection by dragging
-    # tab.state_list_box.bind("<ButtonRelease-1>", disable_selection) # Prevent selection when releasing mouse button
+    # Create a frame inside the window, to show the different messages
+    create_message_frame(tab, 800, 300, 400, 200)
 
     # initialize the selected state in the listbox
     highlight_state(tab.state_list_box, 0, 0)
     tab.last_step = (tab.states[0], tab.states_dict[tab.states[0]][1])
-
-    # Create a label for excluded holes box
-    excluded_holes_label = tk.Label(tab.interactive_window, text="Excluded holes combinations:", font=("Helvetica", 12))
-    excluded_holes_label.place(x = 20 + tab.state_description_box.winfo_width() + tab.state_description_box.winfo_x(), y=state_list_box_label.winfo_y())
-
-    # Create a listbox for excluded holes
-    state_list_box_x = 20 + tab.state_description_box.winfo_width() + tab.state_description_box.winfo_x()
-    state_list_box_y = tab.state_description_box.winfo_y()
-    state_list_box_height = tab.state_list_box.winfo_height()
-    tab.excluded_holes_list_box = create_scrollable_listbox(tab.interactive_window, state_list_box_x, state_list_box_y, state_list_box_height, 300)
-
-    # nessesary to update the excluded holes box width, so we can use it in the next lines
-    tab.excluded_holes_list_box.update_idletasks()
-
-    # Create a label for the current holes box
-    current_holes_label = tk.Label(tab.interactive_window, text="Current holes values:", font=("Helvetica", 12))
-    current_holes_label.place(x = 20 + tab.excluded_holes_list_box.winfo_width() + tab.excluded_holes_list_box.winfo_x(), y=state_list_box_label.winfo_y())
-
-    # Create a listbox for current holes
-    current_holes_box_x = 20 + tab.excluded_holes_list_box.winfo_width() + tab.excluded_holes_list_box.winfo_x()
-    current_holes_box_y = tab.excluded_holes_list_box.winfo_y()
-    current_holes_box_height = tab.excluded_holes_list_box.winfo_height()
-    tab.current_holes_box = create_scrollable_listbox(tab.interactive_window, current_holes_box_x, current_holes_box_y, current_holes_box_height, 200)
-
 
 
 
     tab.synth = Synthesizer(program)
     tab.generator = tab.synth.cegis_interactive(program, P, Q, linv, 10)
 
-    # Create a 'next' button
-    set_linv_button = tk.Button(tab.interactive_window, text="Next step", command=lambda: next_step(cegis, True))
-    set_linv_button.place(x = 300, y=400)  # Set the position of the button (x, y)
+
 
 # Function to handle the button press
 def process_assertion_program_input():
