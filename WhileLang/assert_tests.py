@@ -235,6 +235,68 @@ def holes_basic_case_7():
 
     return test_synth_program(program, P, Q, linv, expected_program, expected_error, disable_prints)
 
+# d := 0;
+# c1 := ?? ;
+# if c1 = 1 then (if x = 0 then d := 1 else skip) else skip ;
+# if c1 = 1 then (if x = 1 then d := 0 else skip) else skip ;
+
+# if c1 = 2 then (if x = 0 then d := 1 else skip) else skip ;
+# if c1 = 2 then (if x = 1 then d := 0 else skip) else skip ;
+
+# if c1 = 3 then d := 1 else skip ;
+
+# assert d = 1
+
+
+
+# d := 0;
+# c1 := ?? ;
+# c2 := ?? ;
+# if c1 = 1 then ( if c2 = 0 then (if x = 0 then d := 0 else skip) else skip) else skip ;
+# if c1 = 1 then ( if c2 = 1 then (if x = 1 then d := 0 else skip) else skip) else skip ;
+# if c1 = 1 then ( if c2 = 2 then (if x = 2 then d := 0 else skip) else skip) else skip ;
+# if c1 = 1 then ( if c2 = 3 then (if x = 3 then d := 0 else skip) else skip) else skip ;
+# if c1 = 1 then ( if c2 = 4 then d := 1 else skip) else skip ;
+# if c1 = 1 then ( if c2 = 5 then d := 1 else skip) else skip ;
+
+# if c2 = 4 then (if x = 1 then d := 0 else skip) else skip ;
+# if c2 = 5 then (if x = 1 then d := 1 else skip) else skip ;
+
+# assert d = 1
+
+
+# a := ??;
+# assert a = 11 ;
+# a := ??;
+# assert a = 13 ;
+# a := ??;
+# assert a = 14 ;
+# a := ??;
+# assert a = 15 ;
+# a := ??;
+# assert a = 16 ;
+# a := ??;
+# assert a = 17 ;
+# a := ??;
+# assert a = 18 ;
+# a := ??;
+# assert a = 11 ;
+# a := ??;
+# assert a = 11 ;
+# a := ??;
+# assert a = 11 ;
+# a := ??;
+# assert a = 12 ;
+# a := ??;
+# assert a = 19 ;
+# a := ??;
+# assert a = 12 ;
+# a := ??;
+# assert a = 13
+
+
+
+
 def holes_no_sol_case_1():
     program = "y:= x + ?? ; if y = 10 then x := 5 else x := 9"
 

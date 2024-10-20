@@ -158,50 +158,51 @@ class Synthesizer:
         """Fills the holes in the program with the values from the solver model."""
         holes_to_fill_dict = self.extract_holes_from_dict(extract_model_assignments(sol))
         print("holes_to_fill_dict: ", holes_to_fill_dict)
-    
-        for key, value in holes_to_fill_dict.items():
-            # Replace each occurrence of 'key' with its corresponding 'value'
-            program = program.replace(key, str(value))
-        return program
+
+        return self.fill_holes_dict(program, holes_to_fill_dict)
     
     def fill_holes_dict(self, program, holes_dict):
         """Fills the holes in the program with the values from the holes dictionary."""
-        for key, value in holes_dict.items():
-            # Replace each occurrence of 'key' with its corresponding 'value'
-            program = program.replace(key, str(value))
-        return program
+        # Regular expression to match 'hole_' followed by one or more digits
+        hole_pattern = re.compile(r'\bhole_\d+\b')
 
-    # def fill_zeros(ast: Tree):
-    #     if(ast.root == "id"):
-    #         if bool(re.match(r'hole_\d+$', ast.subtrees[0].root)):
-    #             ast.subtrees[0].root
+        def replace_hole(match):
+            hole_name = match.group(0)  # Get the matched hole (e.g., 'hole_1')
+            # Replace it with the corresponding value from the dictionary, or keep the original if not found
+            return str(holes_dict.get(hole_name, hole_name))
+
+        # Substitute all matches using the replace_hole function
+        return hole_pattern.sub(replace_hole, program)
 
     def fill_holes_with_zeros(self, program, holes: list):
         """Fills the holes in the program with a '0'"""
-        # print("hole to fill with zeroes: ", holes)
+        print("hole to fill with zeroes: ", holes)
+        print("program: ", program)
     
         holes_dict = {}
         for hole in holes:
             # Replace each occurrence of 'key' with its corresponding 'value'
-            program = program.replace(hole, str(0))
+            # program = program.replace(hole, str(0))
             holes_dict[hole] = 0
-        return program, holes_dict
+
+        new_program = self.fill_holes_dict(program, holes_dict)
+        return new_program, holes_dict
 
     def extract_holes_from_dict(self, dict):
-        hole_pattern = re.compile(r'hole_\d+')
+        hole_pattern = re.compile(r'\bhole_\d+\b')
         # Extract the keys and values that match the pattern
         holes_dict = {k: v for k, v in dict.items() if hole_pattern.match(k)}
         return holes_dict
     
     def extract_counter_example_from_dict(self, dict):
-        hole_pattern = re.compile(r'hole_\d+')
+        hole_pattern = re.compile(r'\bhole_\d+\b')
         # Create a new dictionary excluding keys that match the pattern
         non_holes_dict = {k: v for k, v in dict.items() if not hole_pattern.match(k)}
         return non_holes_dict
 
     def check_for_hole(self, variables):
         # Regular expression to match the pattern "hole_" followed by a number
-        pattern = r'hole_\d+'
+        pattern = r'\bhole_\d+\b'
         
         for var in variables:
             if re.match(pattern, var):
@@ -286,12 +287,14 @@ class Synthesizer:
 
         # Checks for the existence of an input that satisfies the conditions
         print("program holes unrolled: ", program_holes_unrolled)
-        is_exist_input, _ = is_exist_input_to_satisfy(P, ast_holes_unrolled, Q, linv=linv)
+        is_exist_input, solver = is_exist_input_to_satisfy(P, ast_holes_unrolled, Q, linv=linv)
         if(is_exist_input == False):
             print("Error: The given program has no input which can satisfy the conditions")
             if raise_errors:
                 raise self.NoInputToSatisfyProgram("The given program has no input which can satisfy the conditions")
             return ""
+        
+        del solver
 
         
         solver = Solver()
@@ -340,6 +343,8 @@ class Synthesizer:
         VC_final = And(VC)
         solver.add(VC_final)
         
+        # print(solver)
+
         if solver.check() == sat:
             print(">> The program is verified.")
             print("holes:", str(solver.model()) )
@@ -396,7 +401,6 @@ class Synthesizer:
         if(ast_without_assertion is None):
             raise self.ProgramNotValid("The given program can't be parsed")
 
-
         pvars = sorted(list(getPvars(ast_orig)))
         print("Pvars: ", pvars)
 
@@ -446,10 +450,9 @@ class Synthesizer:
     def cegis_interactive(self, orig_program, P, Q, linv = None, unroll_limit = 10):
         self.abort_flag = [False]
 
-        holes, holes_program, program_holes_unrolled, P, Q, linv = self.cegis_init_checks(orig_program, P, Q, linv, unroll_limit)
-
         yield ("State_0", "Wait for initialization", orig_program)
 
+        holes, holes_program, program_holes_unrolled, P, Q, linv = self.cegis_init_checks(orig_program, P, Q, linv, unroll_limit)
 
         yield ("State_1", "Replace holes with variables", holes_program)
 
@@ -469,8 +472,8 @@ class Synthesizer:
         new_holes_dict = {}
 
         # Add bounderies for holes exploration
-        curr_lower_bound = 0
-        curr_upper_bound = 0
+        curr_lower_bound = 5
+        curr_upper_bound = -5
         holes_bound_p = self.get_bounds_condition(holes, curr_lower_bound, curr_upper_bound)
 
         # initialize iteration counter
@@ -551,8 +554,8 @@ class Synthesizer:
             if result == False:
                 # If we can't find holes with bounds, we need to increase the bounds.
                 print("No solution within current bounds - Increasing bounds")
-                curr_lower_bound = curr_lower_bound - 1
-                curr_upper_bound = curr_upper_bound + 1
+                curr_lower_bound = curr_lower_bound - 20
+                curr_upper_bound = curr_upper_bound + 20
                 print(f"new bounds: {curr_lower_bound}, {curr_upper_bound}")
                 # Update the holes bounds predicate
                 holes_bound_p = self.get_bounds_condition(holes, curr_lower_bound, curr_upper_bound)
@@ -614,8 +617,8 @@ class Synthesizer:
         new_holes_dict = {}
 
         # Add bounderies for holes exploration
-        curr_lower_bound = 0
-        curr_upper_bound = 0
+        curr_lower_bound = 5
+        curr_upper_bound = -5
         holes_bound_p = self.get_bounds_condition(holes, curr_lower_bound, curr_upper_bound)
 
         # initialize iteration counter

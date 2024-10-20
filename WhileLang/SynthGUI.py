@@ -29,24 +29,36 @@ assertion_frame.pack(fill="both", expand=True)
 
 # Add the frames as tabs in the notebook
 notebook.add(pbe_frame, text="Synthesize with PBE")
-notebook.add(assertion_frame, text="Synthesize with Assertion")
+notebook.add(assertion_frame, text="Synthesize with CEGIS")
+
+# Set a saparate frame for the loop unrolling limit
+loop_unrolling_frame = tk.Frame(root)
+loop_unrolling_frame.pack(pady=10, padx=10)
 
 # Add a label for the loop unrolling limit
-loop_unrolling_label = tk.Label(root, text="Loop Unrolling Limit (for synthesis only):", font=("Helvetica", 12))
-loop_unrolling_label.pack(pady=5)
+loop_unrolling_label = tk.Label(loop_unrolling_frame, text="Loop Unrolling Limit (for synthesis only):", font=("Helvetica", 12))
 
 # Create an entry widget for the loop unrolling limit with a default value of 10
-loop_unrolling_entry = tk.Entry(root, font=("Helvetica", 12))
+loop_unrolling_entry = tk.Entry(loop_unrolling_frame, font=("Helvetica", 12))
 loop_unrolling_entry.insert(0, "10")  # Set default value
-loop_unrolling_entry.pack(pady=5)
 
+# Pack the loop unrolling label and entry widgets
+loop_unrolling_label.pack(side=tk.LEFT, padx=5)
+loop_unrolling_entry.pack(side=tk.LEFT)
+
+# Add a tooltip for the loop unrolling entry
+CreateToolTip(loop_unrolling_entry, tool_tips_dict["Loop_Unrolling_Entry"])
+
+# Label for the output section
+output_label = tk.Label(root, text="Input Program:", font=("Helvetica", 14))
+output_label.pack(pady=0)
 
 # Create scrollable input text widget with reduced width
 program_input = create_scrollable_text(root, height=7, width=80)  # Reduced width from 90 to 80
 
 # Label for the output section
-output_label = tk.Label(root, text="Synthesis Output", font=("Helvetica", 14))
-output_label.pack(pady=10)
+output_label = tk.Label(root, text="Synthesis Output Program:", font=("Helvetica", 14))
+output_label.pack(pady=0)
 
 # Create scrollable output text widget with reduced width
 output_text = create_scrollable_text(root, height=7, width=80)  # Reduced width from 90 to 80
@@ -83,23 +95,21 @@ def create_pbe_tab():
     # Add a button to set conditions for PBE
     add_condition_button = tk.Button(pbe_frame, text="Set Conditions (P, Q, Linv)", command = lambda : open_conditions_window(pbe))
     add_condition_button.pack(pady=5)
-    # Add a tooltip with a description for the button
-    toolTip = (
-        "Click to open a window where you can set P, Q, and Loop Invariant (Linv) conditions.\n"
-        "Note: for PBE, P will be used only for verification of the output program."
-    )
-    CreateToolTip(add_condition_button, toolTip)
+    CreateToolTip(add_condition_button, tool_tips_dict["Set_Conditions_Button"])
 
     # Add a Button to open the examples window
-    open_window_button = tk.Button(pbe_frame, text="Set Examples", command=lambda: set_examples_routine(pbe))
-    open_window_button.pack(pady=10)
+    set_examples_button = tk.Button(pbe_frame, text="Set Examples", command=lambda: set_examples_routine(pbe))
+    set_examples_button.pack(pady=10)
+    CreateToolTip(set_examples_button, tool_tips_dict["Set_Examples_Button"])
 
     # Add a button to trigger synthesis in the PBE mode
     synthesize_button = tk.Button(pbe_frame, text="Synthesize with PBE", command=lambda : process_pbe_program_input())
     synthesize_button.pack(pady=10)
+    CreateToolTip(synthesize_button, tool_tips_dict["Synthesize_PBE_Button"])
 
     verify_program_button = tk.Button(pbe_frame, text="Verify output Program", state='disabled', command = lambda : verify_output_program(pbe))
     verify_program_button.pack(pady=10)
+    CreateToolTip(verify_program_button, tool_tips_dict["Verify_Output_Button"])
 
     return add_condition_button, verify_program_button
 
@@ -120,31 +130,30 @@ def create_cegis_tab():
     assertion_label.pack(pady=10)
 
     # Add information label for the assertion mode
-    assertion_info = tk.Label(assertion_frame, text="Define assertions to synthesize the program", font=("Helvetica", 12))
+    assertion_info = tk.Label(assertion_frame, text="Define a program with holes and assertions. Then synthesize the program", font=("Helvetica", 12))
     assertion_info.pack(pady=5)
 
     # Add a button to set conditions for CEGIS
     add_condition_button = tk.Button(assertion_frame, text="Set Conditions (P, Q, Linv)", command = lambda : open_conditions_window(cegis))
     add_condition_button.pack(pady=5)
-    # Add a tooltip with a description for the button
-    toolTip = (
-        "Click to open a window where you can set P, Q, and Loop Invariant (Linv) conditions"
-    )
-    CreateToolTip(add_condition_button, toolTip)
+    CreateToolTip(add_condition_button, tool_tips_dict["Set_Conditions_Button"])
 
     # Add a button to trigger synthesis in the assertion mode
-    synthesize_button = tk.Button(assertion_frame, text="Synthesize with Assertion", command=process_assertion_program_input)
+    synthesize_button = tk.Button(assertion_frame, text="Synthesize with CEGIS", command=process_assertion_program_input)
     synthesize_button.pack(pady=20)
+    CreateToolTip(synthesize_button, tool_tips_dict["Synthesize_CEGIS_Button"])
 
     # Create an IntVar to store the checkbox state (1 for checked, 0 for unchecked)
     interactive_var = tk.IntVar()
-    interactive_var.set(1)  # Set the initial value to unchecked
+    interactive_var.set(0)  # Set the initial value to unchecked
     # Create a Checkbox for interactive mode
     interactive_checkbox = tk.Checkbutton(assertion_frame, text="Interactive", variable=interactive_var, command=show_selection)
     interactive_checkbox.pack(pady=0)
+    CreateToolTip(interactive_checkbox, tool_tips_dict["Interactive_Mode_Checkbox"])
 
     verify_program_button = tk.Button(assertion_frame, text="Verify output Program", state='disabled', command = lambda : verify_output_program(cegis))
     verify_program_button.pack(pady=5)
+    CreateToolTip(verify_program_button, tool_tips_dict["Verify_Output_Button"])
 
     return add_condition_button, verify_program_button, interactive_var
 

@@ -55,7 +55,7 @@ def linear_case_1():
     output_examples = [[("d", 1)],
                        [("d", 1)]]
 
-    output_program = get_io_program(orig_program, inputs_examples, output_examples, disable_prints)
+    output_program = get_io_program(orig_program, inputs_examples, output_examples, False)
     
 
     assertion = output_program == expected_program

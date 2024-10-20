@@ -7,8 +7,43 @@ from wp import verify
 from syntax.while_lang import parse
 
 # ------------------------------
-# ToolTip Class
+# ToolTip
 # ------------------------------
+
+tool_tips_dict = {
+    "Set_Conditions_Button": (
+        "Click to open a window where you can set P, Q, and Loop Invariant (Linv) conditions.\n"
+        "Note:\tfor PBE, P will be used only for verification of the output program."
+    ),
+
+    "Set_Examples_Button": (
+        "Click to open a window where you can set input-output examples to synthesize the program with.\n"
+        "Note:\tYou will need to enter a valid program first."
+    ),
+
+    "Synthesize_PBE_Button": (
+        "Click to synthesize the program using the provided input-output examples and Conditions."
+    ),
+
+    "Verify_Output_Button": (
+        "Click to verify the output program using the provided Conditions."
+    ),
+
+    "Loop_Unrolling_Entry": (
+        "Enter the number of times to unroll a 'while' loop in the program.\n"
+        "Note:\tA higher number may lead to a more precise verification, but may also take longer to synthesize.\n"
+        "\tA lower number may lead to a faster synthesis, but may not be able to synthesize the program.\n"
+        "Note:\tThis value is relevant only for the synthesis process, and will not be used to verify the program.\n"
+    ),
+
+    "Synthesize_CEGIS_Button": (
+        "Click to synthesize the program using the provided Conditions."
+    ),
+
+    "Interactive_Mode_Checkbox": (
+        "Check to enable interactive mode. In this mode, you can step through the synthesis process."
+    ),
+}
 
 # Function to create a tooltip
 class CreateToolTip(object):

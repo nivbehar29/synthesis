@@ -233,6 +233,8 @@ def next_step(tab: CEGIS_Tab, to_disable_prints = True):
 
     # Now, perform the next step
 
+    error = ""
+
     try:
         if to_disable_prints:
             with open(os.devnull, 'w') as f:
@@ -248,6 +250,16 @@ def next_step(tab: CEGIS_Tab, to_disable_prints = True):
 
     except StopIteration:
         print("StopIteration has been raised")
+    except (Synthesizer.ProgramNotValid, Synthesizer.ProgramHasInvalidVarName, Synthesizer.ProgramHasNoHoles) as e:
+        _, error = get_final_result(e, "Don't Care :)")
+        print("error:", error)
+    except Exception as e:
+        error = f"An unexpected error occurred: {e}"
+
+    if(error != ""):
+        set_disabled_window_text_flash_2(tab.interactive_message_text, error, 'red2', 'white')
+        finish_interactive_process(tab)
+
 
 def abort(tab: CEGIS_Tab):
     # Kill generator
@@ -274,8 +286,8 @@ def highlight_state(state_list_box: tk.Listbox, index, prev_index):
 
 def create_info_frame(tab: CEGIS_Tab, pos_x, pos_y, width, height):
     # Create a frame inside the window
-    info_frame = tk.Frame(tab.interactive_window, highlightbackground="black", highlightthickness=2) # for debugging the frame size
-    # info_frame = tk.Frame(tab.interactive_window)
+    # info_frame = tk.Frame(tab.interactive_window, highlightbackground="black", highlightthickness=2) # for debugging the frame size
+    info_frame = tk.Frame(tab.interactive_window)
     info_frame.place(x=pos_x, y=pos_y, width=width, height=height)
     info_frame.update_idletasks()
 
@@ -346,8 +358,8 @@ def create_info_frame(tab: CEGIS_Tab, pos_x, pos_y, width, height):
 
 def create_buttons_frame(tab: CEGIS_Tab, pos_x, pos_y, width, height):
     # Create a frame inside the window
-    buttons_frame = tk.Frame(tab.interactive_window, highlightbackground="black", highlightthickness=2) # for debugging the frame size
-    # buttons_frame = tk.Frame(tab.interactive_window)
+    # buttons_frame = tk.Frame(tab.interactive_window, highlightbackground="black", highlightthickness=2) # for debugging the frame size
+    buttons_frame = tk.Frame(tab.interactive_window)
     buttons_frame.place(x=pos_x, y=pos_y, width=width, height=height)
     buttons_frame.update_idletasks()
 
@@ -359,8 +371,8 @@ def create_buttons_frame(tab: CEGIS_Tab, pos_x, pos_y, width, height):
 
 def create_program_frame(tab: CEGIS_Tab, pos_x, pos_y, width, height):
     # Create a frame inside the window
-    program_frame = tk.Frame(tab.interactive_window, highlightbackground="black", highlightthickness=2) # for debugging the frame size
-    # program_frame = tk.Frame(tab.interactive_window)
+    # program_frame = tk.Frame(tab.interactive_window, highlightbackground="black", highlightthickness=2) # for debugging the frame size
+    program_frame = tk.Frame(tab.interactive_window)
     program_frame.place(x=pos_x, y=pos_y, width=width, height=height)
     program_frame.update_idletasks()
 
@@ -392,8 +404,8 @@ def create_program_frame(tab: CEGIS_Tab, pos_x, pos_y, width, height):
 
 def create_message_frame(tab: CEGIS_Tab, pos_x, pos_y, width, height):
     # Create a frame inside the window
-    message_frame = tk.Frame(tab.interactive_window, highlightbackground="black", highlightthickness=2) # for debugging the frame size
-    # message_frame = tk.Frame(tab.interactive_window)
+    # message_frame = tk.Frame(tab.interactive_window, highlightbackground="black", highlightthickness=2) # for debugging the frame size
+    message_frame = tk.Frame(tab.interactive_window)
     message_frame.place(x=pos_x, y=pos_y, width=width, height=height)
     message_frame.update_idletasks()
 
@@ -420,7 +432,7 @@ def create_interactive_window(tab: CEGIS_Tab, program, P, Q, linv):
     # Create a new window
     tab.interactive_window = Toplevel(tab.root)
     tab.interactive_window.title("Interactive CEGIS")
-    tab.interactive_window.geometry("1600x800")
+    tab.interactive_window.geometry("1200x800")
 
     # Label for the window
     window_label = tk.Label(tab.interactive_window, text="Interactive CEGIS", font=("Helvetica", 14))
@@ -447,7 +459,30 @@ def create_interactive_window(tab: CEGIS_Tab, program, P, Q, linv):
     tab.synth = Synthesizer(program)
     tab.generator = tab.synth.cegis_interactive(program, P, Q, linv, 10)
 
+def get_final_result(synth_result, program_text):
+    final_output = ""
+    error = ""
+    # cegis.output_text.insert("1.0", f"Error: {str(result)}")
+    if isinstance(synth_result, Synthesizer.ProgramNotValid):
+        error = "Error: The given program can't be parsed"
+    elif isinstance(synth_result, Synthesizer.ProgramHasNoHoles):
+        error = "Message: Program has no holes. You can try to verify your program."
+        print("synthesis result:", program_text)
+        final_output = program_text #remove_assertions_program(program_text)
+    elif isinstance(synth_result, Synthesizer.ProgramNotVerified):
+        error = "Error: The program can't be verified for all possible inputs. If this is not the excpected outcome:\n "
+        error += "1. Try increasing the loop unrolling limit.\n"
+        error += "2. Check if the loop invariant is correct.\n"
+        error += "3. Check if the pre-condition and post-condition are correct."
+    elif isinstance(synth_result, Synthesizer.ProgramHasInvalidVarName):
+        error = f"Error: Invalid variable name: {synth_result}.\nPlease use valid variable names which are not of the form 'hole_x', where x is a number."    
+    elif isinstance(synth_result, Exception):
+        error = f"An unexpected error occurred: {synth_result}"
+    else:
+        print("synthesis result:", synth_result)
+        final_output = synth_result #remove_assertions_program(synth_result)
 
+    return final_output, error
 
 # Function to handle the button press
 def process_assertion_program_input():
@@ -470,10 +505,11 @@ def process_assertion_program_input():
         set_disabled_window_text_flash(cegis.message_text, "Error: Loop unrolling limit must be greater than or equal to 0.", True)
         return
 
+    # If interactive mode is enabled, create the interactive window
     if(cegis.interactive_var.get() == 1):
         print("Interactive mode is enabled")
         P, Q, linv = eval_conditions(cegis.P_str, cegis.Q_str, cegis.linv_str)
-        interactive_window = create_interactive_window(cegis, program_text, P, Q, linv)
+        create_interactive_window(cegis, program_text, P, Q, linv)
         # Open the conditions window
     else:
         queue = multiprocessing.Queue()
@@ -503,27 +539,28 @@ def process_assertion_program_input():
 
                     # Get the result from the queue
                     synth_result = queue.get()
-                    final_output = ""
-                    error = ""
-                    # cegis.output_text.insert("1.0", f"Error: {str(result)}")
-                    if isinstance(synth_result, Synthesizer.ProgramNotValid):
-                        error = "Error: The given program can't be parsed"
-                    elif isinstance(synth_result, Synthesizer.ProgramHasNoHoles):
-                        error = "Message: Program has no holes. You can try to verify your program."
-                        print("synthesis result:", program_text)
-                        final_output = remove_assertions_program(program_text)
-                    elif isinstance(synth_result, Synthesizer.ProgramNotVerified):
-                        error = "Error: The program can't be verified for all possible inputs. If this is not the excpected outcome:\n "
-                        error += "1. Try increasing the loop unrolling limit.\n"
-                        error += "2. Check if the loop invariant is correct.\n"
-                        error += "3. Check if the pre-condition and post-condition are correct."
-                    elif isinstance(synth_result, Synthesizer.ProgramHasInvalidVarName):
-                        error = f"Error: Invalid variable name: {synth_result}.\nPlease use valid variable names which are not of the form 'hole_x', where x is a number."    
-                    elif isinstance(synth_result, Exception):
-                        error = f"An unexpected error occurred: {synth_result}"
-                    else:
-                        print("synthesis result:", synth_result)
-                        final_output = remove_assertions_program(synth_result)
+                    final_output, error = get_final_result(synth_result, program_text)
+                    # final_output = ""
+                    # error = ""
+                    # # cegis.output_text.insert("1.0", f"Error: {str(result)}")
+                    # if isinstance(synth_result, Synthesizer.ProgramNotValid):
+                    #     error = "Error: The given program can't be parsed"
+                    # elif isinstance(synth_result, Synthesizer.ProgramHasNoHoles):
+                    #     error = "Message: Program has no holes. You can try to verify your program."
+                    #     print("synthesis result:", program_text)
+                    #     final_output = remove_assertions_program(program_text)
+                    # elif isinstance(synth_result, Synthesizer.ProgramNotVerified):
+                    #     error = "Error: The program can't be verified for all possible inputs. If this is not the excpected outcome:\n "
+                    #     error += "1. Try increasing the loop unrolling limit.\n"
+                    #     error += "2. Check if the loop invariant is correct.\n"
+                    #     error += "3. Check if the pre-condition and post-condition are correct."
+                    # elif isinstance(synth_result, Synthesizer.ProgramHasInvalidVarName):
+                    #     error = f"Error: Invalid variable name: {synth_result}.\nPlease use valid variable names which are not of the form 'hole_x', where x is a number."    
+                    # elif isinstance(synth_result, Exception):
+                    #     error = f"An unexpected error occurred: {synth_result}"
+                    # else:
+                    #     print("synthesis result:", synth_result)
+                    #     final_output = remove_assertions_program(synth_result)
 
                     if(error != ""):
                         set_disabled_window_text_flash(cegis.message_text, error, True)
