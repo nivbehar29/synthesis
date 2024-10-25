@@ -468,7 +468,7 @@ def get_final_result(synth_result, program_text):
     elif isinstance(synth_result, Synthesizer.ProgramHasNoHoles):
         error = "Message: Program has no holes. You can try to verify your program."
         print("synthesis result:", program_text)
-        final_output = program_text #remove_assertions_program(program_text)
+        final_output = remove_assertions_program(program_text)
     elif isinstance(synth_result, Synthesizer.ProgramNotVerified):
         error = "Error: The program can't be verified for all possible inputs. If this is not the excpected outcome:\n "
         error += "1. Try increasing the loop unrolling limit.\n"
@@ -480,7 +480,7 @@ def get_final_result(synth_result, program_text):
         error = f"An unexpected error occurred: {synth_result}"
     else:
         print("synthesis result:", synth_result)
-        final_output = synth_result #remove_assertions_program(synth_result)
+        final_output = remove_assertions_program(synth_result)
 
     return final_output, error
 

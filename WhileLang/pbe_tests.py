@@ -95,6 +95,7 @@ def multiple_ios_case_1():
 def multiple_ios_case_2():
     orig_program =     "c1 := ?? + x ; c2 := ?? + y ; c3 := ?? + z"
     expected_program = "c1 := 3 + x ; c2 := 6 + y ; c3 := 9 + z"
+    #assert x = 1 ; assert y = 2 ; assert z = 3 ; c1 := ?? + x ; c2 := ?? + y ; c3 := ?? + z 
 
     inputs_examples = [[("x", 1), ("y", 2), ("z", 3)],
                        [("x", 2), ("y", 3), ("z", 4)],

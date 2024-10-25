@@ -12,8 +12,7 @@ from syntax.while_lang import parse
 
 tool_tips_dict = {
     "Set_Conditions_Button": (
-        "Click to open a window where you can set P, Q, and Loop Invariant (Linv) conditions.\n"
-        "Note:\tfor PBE, P will be used only for verification of the output program."
+        "Click to open a window where you can set P, Q, and Loop Invariant (Linv) conditions."
     ),
 
     "Set_Examples_Button": (
@@ -48,11 +47,15 @@ tool_tips_dict = {
 # Function to create a tooltip
 class CreateToolTip(object):
     def __init__(self, widget, text):
-        self.widget = widget
-        self.text = text
+        self.widget : tk.Widget = widget
+        self.text : tk.Text = text
         self.tooltip_window = None
-        widget.bind("<Enter>", self.show_tooltip)
+        widget.bind("<Enter>", self.schedule_tooltip)
         widget.bind("<Leave>", self.hide_tooltip)
+
+    def schedule_tooltip(self, event=None):
+        # Schedule the tooltip to appear after 0.65 seconds (650 milliseconds)
+        self.tooltip_id = self.widget.after(650, self.show_tooltip)
 
     def show_tooltip(self, event=None):
         x = y = 0
@@ -62,13 +65,17 @@ class CreateToolTip(object):
         self.tooltip_window = tw = tk.Toplevel(self.widget)
         tw.wm_overrideredirect(True)  # Remove window decorations
         tw.wm_geometry(f"+{x}+{y}")
-        label = tk.Label(tw, text=self.text, background="yellow", relief="solid", borderwidth=1, justify='left')
+        label = tk.Label(tw, text=self.text, background="lemon chiffon", relief="solid", borderwidth=1, justify='left')
         label.pack()
 
     def hide_tooltip(self, event=None):
+        # Cancel the scheduled tooltip if it hasn't appeared yet
+        if self.tooltip_id:
+            self.widget.after_cancel(self.tooltip_id)
+            self.tooltip_id = None
         if self.tooltip_window:
             self.tooltip_window.destroy()
-        self.tooltip_window = None
+            self.tooltip_window = None
 
 # ------------------------------
 # Wait Window For Output Program Verification
