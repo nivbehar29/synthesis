@@ -35,12 +35,63 @@ tool_tips_dict = {
         "Note:\tThis value is relevant only for the synthesis process, and will not be used to verify the program.\n"
     ),
 
+    "Add_Example_Button": (
+        "Click to create a new input-output example to the list below, which can be modified or deleted."
+    ),
+
+    "Save_Examples_Button": (
+        "Click to save the input-output examples below."
+    ),
+
+    "Delete_Example_Button": (
+        "Click to delete this input-output example from the list.."
+    ),
+
     "Synthesize_CEGIS_Button": (
         "Click to synthesize the program using the provided Conditions."
     ),
 
     "Interactive_Mode_Checkbox": (
         "Check to enable interactive mode. In this mode, you can step through the synthesis process."
+    ),
+
+    "Interactive_Mode_States_Box": (
+        "Shows the different states in the synthesis process.\n"
+        "You can select a state to see its details in the description box.\n"
+        "Current state is highlighted in blue, and in yellow in case you have selected a different state."
+    ),
+
+    "Interactive_Mode_State_Description_Box": (
+        "Shows a description of the current state in the synthesis process.\n"
+        "You can also select a step to see its details here."
+    ),
+
+    "Interactive_Mode_Excluded_Holes_Box": (
+        "Shows the holes which are excluded from the synthesis process, after a verification failure."
+    ),
+
+    "Interactive_Mode_Current_Holes_Box": (
+        "Shows the current holes assignments which are being used in the synthesis process."
+    ),
+
+    "Interactive_Mode_Current_Program_Box": (
+        "Shows the current program in the synthesis process. it may contain holes ('??'), or filled holes."
+    ),
+
+    "Interactive_Mode_Messages_Box": (
+        "Shows different messages\errors, which are generated after a step execution."
+    ),
+
+    "Interactive_Mode_Holes_Program_Box": (
+        "Shows the program after replacing holes ('??') with holes variables."
+    ),
+
+    "Interactive_Mode_Next_Step_Button": (
+        "Click to execute the current selected step in the synthesis process."
+    ),
+
+    "Interactive_Mode_Abort_Button": (
+        "Click to abort the synthesis process."
     ),
 }
 
@@ -246,14 +297,27 @@ def open_conditions_window(tab):
     # Create a new window
     tab.conditions_window = Toplevel(tab.root)
     tab.conditions_window.title("Set Conditions - " + tab.name)
-    tab.conditions_window.geometry("600x400")
+    tab.conditions_window.geometry("650x600")
     # conditions_window.grab_set()
 
     # Label for the window
     window_label = tk.Label(tab.conditions_window, text="Set Conditions - " + tab.name, font=("Helvetica", 14))  # Larger font size
     window_label.pack(pady=10)
 
-    pad_y = 40
+    pad_y = 240
+
+    description_text = (
+        "Enter the Loop-Invariant, Pre-Condition, and Post-Condition for the program.\n"
+        "The syntax is used to define a lambda function in Python, using Z3 operators.\n\n"
+        "For example, you can use 'And', 'Or' functions, and 'd' as a dictionary:\n"
+        "And(d['a'] == d['b'], Or(d['a'] > 5, d['a'] < -5))\n\n"
+        "Please make sure you are using parameters which are present in the program you have provided.\n\n"
+        "After writing a condition, press the respective 'Set' button to set the condition.\n"
+        "In addition, you can reset a condition to 'True' by clicking the respective 'Reset' button."
+    )
+
+    description_label = tk.Label(tab.conditions_window, text=description_text, font=("Helvetica", 10))
+    description_label.pack(pady=5)
 
     # --- Loop-Invariant Section ---
 

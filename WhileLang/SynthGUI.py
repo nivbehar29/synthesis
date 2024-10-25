@@ -12,7 +12,7 @@ from SynthGUI_PBE_tab import *
 
 # Initialize the main window
 root = tk.Tk()
-root.title("While Language Synthesis")
+root.title("Synthesizer")
 root.geometry("800x900")  # Increased height to accommodate both input and output areas
 
 # Create a Notebook for tabs

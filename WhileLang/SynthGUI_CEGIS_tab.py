@@ -295,6 +295,7 @@ def create_info_frame(tab: CEGIS_Tab, pos_x, pos_y, width, height):
     state_list_box_label = tk.Label(info_frame, text="States:", font=("Helvetica", 12))
     state_list_box_label.place(x = 0, y=0)
     state_list_box_label.update_idletasks()
+    CreateToolTip(state_list_box_label, tool_tips_dict["Interactive_Mode_States_Box"])
 
     # Create a listbox for the states. the listbox width will be the length of the longest string
     concatenated_strings = [f"{key}: {value[0]}" for key, value in cegis.states_dict.items()]
@@ -312,6 +313,7 @@ def create_info_frame(tab: CEGIS_Tab, pos_x, pos_y, width, height):
     # Create selected state description
     states_description_label = tk.Label(info_frame, text="State description:", font=("Helvetica", 12))
     states_description_label.place(x = tab.state_list_box.winfo_width() + tab.state_list_box.winfo_x(), y=state_list_box_label.winfo_y())
+    CreateToolTip(states_description_label, tool_tips_dict["Interactive_Mode_State_Description_Box"])
 
     tab.state_description_box = tk.Text(info_frame, height=len(tab.states), width=30, wrap=tk.WORD)
     tab.state_description_box.place(x = tab.state_list_box.winfo_width() + tab.state_list_box.winfo_x(), y=tab.state_list_box.winfo_y())
@@ -336,6 +338,7 @@ def create_info_frame(tab: CEGIS_Tab, pos_x, pos_y, width, height):
     # Create a label for excluded holes box
     excluded_holes_label = tk.Label(info_frame, text="Excluded holes combinations:", font=("Helvetica", 12))
     excluded_holes_label.place(x = 20 + tab.state_description_box.winfo_width() + tab.state_description_box.winfo_x(), y=state_list_box_label.winfo_y())
+    CreateToolTip(excluded_holes_label, tool_tips_dict["Interactive_Mode_Excluded_Holes_Box"])
 
     # Create a listbox for excluded holes
     state_list_box_x = 20 + tab.state_description_box.winfo_width() + tab.state_description_box.winfo_x()
@@ -349,6 +352,7 @@ def create_info_frame(tab: CEGIS_Tab, pos_x, pos_y, width, height):
     # Create a label for the current holes box
     current_holes_label = tk.Label(info_frame, text="Current holes values:", font=("Helvetica", 12))
     current_holes_label.place(x = 20 + tab.excluded_holes_list_box.winfo_width() + tab.excluded_holes_list_box.winfo_x(), y=state_list_box_label.winfo_y())
+    CreateToolTip(current_holes_label, tool_tips_dict["Interactive_Mode_Current_Holes_Box"])
 
     # Create a listbox for current holes
     current_holes_box_x = 20 + tab.excluded_holes_list_box.winfo_width() + tab.excluded_holes_list_box.winfo_x()
@@ -366,8 +370,11 @@ def create_buttons_frame(tab: CEGIS_Tab, pos_x, pos_y, width, height):
     # Create Next \ Abort buttons
     tab.next_button = tk.Button(buttons_frame, text="Next step", command=lambda: next_step(cegis, True))
     tab.next_button.place(x = 0, y=0)  # Set the position of the button (x, y)
+    CreateToolTip(tab.next_button, tool_tips_dict["Interactive_Mode_Next_Step_Button"])
+
     tab.abort_button = tk.Button(buttons_frame, text="Abort", command=lambda: abort(cegis))
     tab.abort_button.place(x = 100, y=0)  # Set the position of the button (x, y)
+    CreateToolTip(tab.abort_button, tool_tips_dict["Interactive_Mode_Abort_Button"])
 
 def create_program_frame(tab: CEGIS_Tab, pos_x, pos_y, width, height):
     # Create a frame inside the window
@@ -380,6 +387,7 @@ def create_program_frame(tab: CEGIS_Tab, pos_x, pos_y, width, height):
     program_label = tk.Label(program_frame, text="Current program:", font=("Helvetica", 12))
     program_label.place(x = 0, y=0)
     program_label.update_idletasks()
+    CreateToolTip(program_label, tool_tips_dict["Interactive_Mode_Current_Program_Box"])
 
     # Create a text box for the program
     tab.current_program_text_box = tk.Text(program_frame, height=10, width=90, wrap=tk.WORD)
@@ -393,6 +401,7 @@ def create_program_frame(tab: CEGIS_Tab, pos_x, pos_y, width, height):
     holes_program_label = tk.Label(program_frame, text="Holes program:", font=("Helvetica", 12))
     holes_program_label.place(x = 0, y=tab.current_program_text_box.winfo_y() + tab.current_program_text_box.winfo_height() + 10)
     holes_program_label.update_idletasks()
+    CreateToolTip(holes_program_label, tool_tips_dict["Interactive_Mode_Holes_Program_Box"])
 
     # Create a text box for the holes program
     tab.holes_program_text_box = tk.Text(program_frame, height=10, width=90, wrap=tk.WORD)
@@ -413,6 +422,7 @@ def create_message_frame(tab: CEGIS_Tab, pos_x, pos_y, width, height):
     message_label = tk.Label(message_frame, text="Messages:", font=("Helvetica", 12))
     message_label.place(x = 0, y = 0)
     message_label.update_idletasks()
+    CreateToolTip(message_label, tool_tips_dict["Interactive_Mode_Messages_Box"])
 
     # Create a text box for the message
     tab.interactive_message_text = create_scrollable_text(message_frame, 7, 40, 0, message_label.winfo_y() + 25, tk.WORD)
@@ -425,9 +435,9 @@ def create_message_frame(tab: CEGIS_Tab, pos_x, pos_y, width, height):
 # Initializes the Interactive window
 def create_interactive_window(tab: CEGIS_Tab, program, P, Q, linv):
     # Check if the window is already open
-    # if tab.interactive_window is not None and tab.interactive_window.winfo_exists():
-    #     tab.interactive_window.lift()  # Bring the existing window to the front
-    #     return
+    if tab.interactive_window is not None and tab.interactive_window.winfo_exists():
+        tab.interactive_window.lift()  # Bring the existing window to the front
+        return
 
     # Create a new window
     tab.interactive_window = Toplevel(tab.root)
@@ -453,8 +463,6 @@ def create_interactive_window(tab: CEGIS_Tab, program, P, Q, linv):
     # initialize the selected state in the listbox
     highlight_state(tab.state_list_box, 0, 0)
     tab.last_step = (tab.states[0], tab.states_dict[tab.states[0]][1])
-
-
 
     tab.synth = Synthesizer(program)
     tab.generator = tab.synth.cegis_interactive(program, P, Q, linv, 10)
@@ -540,27 +548,6 @@ def process_assertion_program_input():
                     # Get the result from the queue
                     synth_result = queue.get()
                     final_output, error = get_final_result(synth_result, program_text)
-                    # final_output = ""
-                    # error = ""
-                    # # cegis.output_text.insert("1.0", f"Error: {str(result)}")
-                    # if isinstance(synth_result, Synthesizer.ProgramNotValid):
-                    #     error = "Error: The given program can't be parsed"
-                    # elif isinstance(synth_result, Synthesizer.ProgramHasNoHoles):
-                    #     error = "Message: Program has no holes. You can try to verify your program."
-                    #     print("synthesis result:", program_text)
-                    #     final_output = remove_assertions_program(program_text)
-                    # elif isinstance(synth_result, Synthesizer.ProgramNotVerified):
-                    #     error = "Error: The program can't be verified for all possible inputs. If this is not the excpected outcome:\n "
-                    #     error += "1. Try increasing the loop unrolling limit.\n"
-                    #     error += "2. Check if the loop invariant is correct.\n"
-                    #     error += "3. Check if the pre-condition and post-condition are correct."
-                    # elif isinstance(synth_result, Synthesizer.ProgramHasInvalidVarName):
-                    #     error = f"Error: Invalid variable name: {synth_result}.\nPlease use valid variable names which are not of the form 'hole_x', where x is a number."    
-                    # elif isinstance(synth_result, Exception):
-                    #     error = f"An unexpected error occurred: {synth_result}"
-                    # else:
-                    #     print("synthesis result:", synth_result)
-                    #     final_output = remove_assertions_program(synth_result)
 
                     if(error != ""):
                         set_disabled_window_text_flash(cegis.message_text, error, True)

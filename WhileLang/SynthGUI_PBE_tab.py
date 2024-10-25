@@ -136,6 +136,7 @@ def add_example(tab: PBE_Tab, example_frames, parameters, existing_example=None)
     # Add delete button for each example
     delete_button = tk.Button(example_frame, text="Delete", command=lambda: delete_example(example_frames, example_frame))
     delete_button.pack(side=tk.LEFT, padx=5)
+    CreateToolTip(delete_button, tool_tips_dict["Delete_Example_Button"])
 
     # Store the variables for later use
     example_frames.append({
@@ -160,13 +161,25 @@ def open_examples_window(tab: PBE_Tab, parameters, current_examples=None):
 
     example_frames = []
 
+    description_text = (
+        "Enter input-output examples for the program.\n"
+        "Each example has its own row with input and output values for each parameter.\n"
+        "For each parameter, the left input box is for the input value and the right input box is for the output value.\n"
+        "Leave empty fields for unknown values.\n"
+    )
+
+    description_label = tk.Label(tab.examples_window, text=description_text, font=("Helvetica", 10))
+    description_label.pack(pady=5)
+
     # Button to add a new example row
     add_button = tk.Button(tab.examples_window, text="Add Example", command=lambda: add_example(tab, example_frames, parameters))
     add_button.pack(pady=10)
+    CreateToolTip(add_button, tool_tips_dict["Add_Example_Button"])
 
     # Button to save examples
     save_button = tk.Button(tab.examples_window, text="Save Examples", command=lambda: save_examples(example_frames, parameters))
     save_button.pack(pady=10)
+    CreateToolTip(save_button, tool_tips_dict["Save_Examples_Button"])
 
     # Load existing examples if they are provided
     if current_examples:
@@ -184,7 +197,7 @@ def set_examples_routine(tab: PBE_Tab):
     # First try to parse the program
     ast = parse(program)
     if ast is None:
-        set_disabled_window_text_flash(tab.message_text, "Error: Invalid program. Please enter a valid program.", True)
+        set_disabled_window_text_flash(tab.message_text, "Error: Invalid program. Please enter a valid program, and then set the examples.", True)
         return
     
     parameters = list(getPvars(ast))
