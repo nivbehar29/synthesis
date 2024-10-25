@@ -461,4 +461,4 @@ def set_disabled_window_text_flash(window: tk.Text, text: str, error = False):
 
 def set_disabled_window_text_flash_2(window: tk.Text, text: str, flash_color, original_background_color):
     set_disabled_window_text(window, text)  # Display the text
-    flash_text_widget(window, original_background_color, flash_color)  # Flash the text widget to indicate the change
+    flash_text_widget(window, original_background_color, flash_color, 2000)  # Flash the text widget to indicate the change
