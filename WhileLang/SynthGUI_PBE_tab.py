@@ -376,7 +376,7 @@ def process_pbe_program_input():
                 elif isinstance(synth_result, Synthesizer.ProgramHasInvalidVarName):
                     error = f"Error: Invalid variable name: {synth_result}.\nPlease use valid variable names which are not of the form 'hole_x', where x is a number."
                 elif isinstance(synth_result, Synthesizer.NoExamplesProvided):
-                    error = "Error: No input-output examples has been provided. Please set examples and then synthesize."
+                    error = "Error: No input-output examples has been provided. Please set examples and then synthesize.\nFor synthesizing without examples, use the CEGIS tab."
                 elif isinstance(synth_result, Exception):
                     error = f"An unexpected error occurred: {synth_result}"
                 else:

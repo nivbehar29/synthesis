@@ -1,12 +1,20 @@
 # SynthGUI
-
----
+<a id="readme-top"></a>
 
 ## **Table of Contents**
 
 1. [Introduction](#introduction)
 2. [Features](#Features)
 3. [Usage](#usage)
+    - [General GUI Description](#general-gui-description)
+    - [Set Conditions Window](#Set-Conditions-Window)
+    - [Set Examples Window](#Set-Examples-Window)
+    - [PBE Simple Example](#PBE-Simple-Example)
+    - [CEGIS Synthesizer](#CEGIS-Synthesizer)
+    - [CEGIS Interactive Mode](#CEGIS-Interactive-Mode)
+4. [Interesting Cases](#Interesting-Cases)
+    - [Playing With Unroll Limit](#Playing-With-Unroll-Limit)
+    - [Diverging & Unrealizable Programs](#Diverging-&-Unrealizable-Programs)
 
 ---
 
@@ -16,6 +24,7 @@ SynthGUI is a graphical user interface for synthesizing programs using PBE (Prog
 This project is built using Python.
 The programs synthesized by SynthGUI follow the syntax of the WhileLang language.
 
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ## **Features**
 
@@ -38,17 +47,18 @@ Interactive mode allows you to step through the synthesis process interactively.
 - **Tooltip Support for Better User Guidance**:
 Tooltips provide additional information about various elements in the GUI. They appear when hovering over an element, helping users understand the functionality of different components. If you are not sure about the purpose of an element in the GUI, try to hover over it, or over its label.
 
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ## **Usage**
 
-**Running The GUI**:
+### **Running The GUI**:
 To run the GUI, execute the following command:
 ```sh
 python WhileLang/SynthGUI.py
 ```
 
-**Running The Tests**:
-To run the pbe tests, execute the following command:
+### **Running The Tests**:
+To run the PBE tests, execute the following command:
 ```sh
 python WhileLang/Tests.py pbe
 ```
@@ -57,7 +67,9 @@ To run the CEGIS tests, execute the following command:
 python WhileLang/Tests.py cegis
 ```
 
-**General GUI Description**:
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+### **General GUI Description**:
 
 ![PBE & CEGIS tabs](Screenshots/PBE_CEGIS_Tabs.jpg)
 
@@ -81,7 +93,9 @@ python WhileLang/Tests.py cegis
 <li><strong><em>Interactive checkbox</em></strong> (CEGIS synthesizer only) - Opens a window where you can step through the CEGIS process.</li>
 </ol>
 
-**Set Conditions Window**:
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+### **Set Conditions Window**:
 
   For both PBE and CEGIS, you can enter pre/post conditions, and a loop invariant.
   To enter this condition, press the 'Set Conditions' button, and the following window will pop up:
@@ -101,7 +115,9 @@ And(d['a'] == d['b'], Or(d['a'] > 5, d['a'] < -5))
   After writing a condition, press the respective 'Set' button to set the condition.
   In addition, you can reset a condition to 'True' by clicking the respective 'Reset' button.
 
-**Set Examples Window**:
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+### **Set Examples Window**:
 
   For PBE synthesizer, you may enter some input-output examples for the provided program variables.
   To open this window, press the 'Set Examples' button.
@@ -119,17 +135,23 @@ c1 := ?? + x ; c2 := ?? + y ; c3 := ?? + z
   For each example, you can set different IO for the different variables.
   For each variable, the left input box is for the input value, and the right input box is for the output value.
 
-**PBE Simple Example**:
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+### **PBE Simple Example**:
 
   Here is an example for synthesizing a simple program with PBE, assertions, Pre-condition and 2 different IO examples:
 ![PBE Example](Screenshots/PBE_Usage_Example.jpg)
 
-**CEGIS Synthesizer**:
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+### **CEGIS Synthesizer**:
 
   In CEGIS it is possible to synthesize a program without any input-output examples.
   The synthesizing process depends only on pre\post conditions, and assertions, using the CEGIS algorithm.
 
-**CEGIS Interactive Mode**:
+  <p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+### **CEGIS Interactive Mode**:
  
  Another feature we have implemented is an interactive mode for CEGIS, where you can step through the process of the CEGIS algorithm.
  This feature is for learning purposes and you are more then welcome to try it out.
@@ -151,7 +173,9 @@ c1 := ?? + x ; c2 := ?? + y ; c3 := ?? + z
 
  ![Interactive CEGIS](Screenshots/Interactive_CEGIS.jpg)
 
-## **Interesting Cases:**:
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+## **Interesting Cases**
 
 ### **Playing With Unroll Limit**:
 
@@ -170,15 +194,15 @@ y := 0 ; x := 0 ; t := hole_t ; while x < t do ( y := y + hole_y ; x := x + hole
 
  We know that the final result of 'y' should be 6.
  There are actually infinite solutions to this problem, for example:
- let hole_y be 1. we can set hole_x and hole_t to any values which satisfy the condition: 
+ let hole_y be 1. we can set hole_x and hole_t to any values which satisfy the following condition: 
 ```sh
 hole_t = 6 * hole_x, hole_x > 0
 ```
 
- This way, we have infinite number of solutions which satisfy the condition that y = 6 in the end of the program.
+ This way, we have infinite number of solutions which satisfy the post condition: y = 6.
  For this reason, we might want to set some boundaries for the holes - so we can analayze what we can get and how the synthesizer might react:
 ```sh
-"y := 0 ; x := 0 ; t := ?? ; while x < t do ( y := y + ?? ; x := x + ??) ; assert y = 6 ; assert x <= 6 ; assert x >= 0 ; assert t <= 6"
+y := 0 ; x := 0 ; t := ?? ; while x < t do ( y := y + ?? ; x := x + ??) ; assert y = 6 ; assert x <= 6 ; assert x >= 0 ; assert t <= 6
 ```
 
  This way we have a finite number of solutions, here they are:
@@ -228,11 +252,11 @@ y := 0 ; x := 0 ; t := 6 ; while x < t do ( y := y + 6 ; x := x + 6)
  But, if we set the unroll limit to less than that, the number of solution decreases.
  For example, if we set the unroll limit to 1, then the program is equivalent to the following program:
 ```sh
-"y := 0 ; x := 0 ; t := hole_t ; if x < t then ( y := y + hole_y ; x := x + hole_x) else skip ; assert x >= t ; assert y = 6 ; assert x <= 6 ; assert x >= 0 ; assert t <= 6"
+y := 0 ; x := 0 ; t := hole_t ; if x < t then ( y := y + hole_y ; x := x + hole_x) else skip ; assert x >= t ; assert y = 6 ; assert x <= 6 ; assert x >= 0 ; assert t <= 6
 ```
 
 **Notice that we have added another assertion after the 'skip' statement, which ensures that the 'while' condition doesn't hold when it's done.**
- Anyway, for this program, its easy to see that hole_y has to be filled with 6.
+ Anyway, for this program, it's easy to see that hole_y has to be filled with 6.
  As for hole_t and hole_x, here are the possible solutions:
 ```sh
 y := 0 ; x := 0 ; t := 1 ; while x < t do ( y := y + 6 ; x := x + 1)
@@ -264,10 +288,30 @@ y := 0 ; x := 0 ; t := 6 ; while x < t do ( y := y + 6 ; x := x + 6)
 ```
  
  Although we have less results to get, there are still quite amount of them,
- and we can get one of them with less time of synthesis because we unrolled the loop only once.
+ and we can get one of them with less time of synthesis because we have unrolled the loop only once.
 
  The above analysis gives us several insights regarding the act of lowering the unroll limit:
  1. When we set the unroll limit to a smaller value, the synthesizing process will be faster.
  2. We can limit the amount of loops we want to execute, which leads to a program that run faster, and still outputs a valid solution.
  3. We can use the advantage of limiting the loop amount, to get different results.
  
+ In addition, its interesting that the synthesizer can give us different results, even if we don't change the unroll limit (Try the above program with unroll limit of 6).
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+ ### **Diverging & Unrealizable Programs**:
+
+ The tool is indeed not perfect, an example for it is the following program:
+```sh
+y := x + ?? ; if y = 10 then x := 123 else x := 456 ; assert x = 456
+```
+
+ When sending this program to CEGIS synthesizer, it won't stop, because it will always find a hole assignment, which will end up leading to a counter example.
+ You can try it with the interactive mode we have implemented and see :)
+
+ Altough, when adding an assertion for bounding x, z3-solver manages to determine that the program isn't solvable quite fast:
+```sh
+assert x > -10000000 ; assert x < 10000000 ; y := x + ?? ; if y = 10 then x := 123 else x := 456 ; assert x = 456
+```
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
