@@ -80,16 +80,16 @@ python WhileLang/Tests.py cegis
   You may select which synthesizer you want to use at any time.
   the PBE tab is selected by default.
 
-  In addition, you will find this differents elements:
+  In addition, you will find the following differents elements:
 <ol start="3">
 <li><strong><em>Set conditions button (P, Q, Linv)</em></strong> - Opens a new window to set pre\post-conditions, and loop invariant.</li>
-<li><strong><em>Set examples button</em></strong> (PBE synthesizer only) - Opens a window where you can set inout-output examples.</li>
+<li><strong><em>Set examples button</em></strong> (PBE synthesizer only) - Opens a window where you can set input-output examples.</li>
 <li><strong><em>Senthesize button</em></strong> - Synthesize the given program.</li>
 <li><strong><em>Verify output program button</em></strong> - Use it to verify the output program.</li>
 <li><strong><em>Loop unrolling limit box</em></strong> - Sets the value of how many times the synthesizer should unroll a loop (10 by default).</li>
 <li><strong><em>Input program text box</em></strong> - Here you may enter the program you want to synthesize.</li>
 <li><strong><em>Output program box</em></strong> - Shows the synthesized program. This program can be verified by pressing the 'Verify output program' button.</li>
-<li><strong><em>Messages box</em></strong> - Shows all kinds of messages related to the process, and errors.</li>
+<li><strong><em>Messages box</em></strong> - Shows all kinds of messages related to the synthesis process, and errors.</li>
 <li><strong><em>Interactive checkbox</em></strong> (CEGIS synthesizer only) - Opens a window where you can step through the CEGIS process.</li>
 </ol>
 
@@ -98,7 +98,7 @@ python WhileLang/Tests.py cegis
 ### **Set Conditions Window**:
 
   For both PBE and CEGIS, you can enter pre/post conditions, and a loop invariant.
-  To enter this condition, press the 'Set Conditions' button, and the following window will pop up:
+  To enter this window, press the 'Set Conditions' button, and the following window will pop up:
 
 ![Conditions Window](Screenshots/Conditions_Window.jpg)
 
@@ -106,12 +106,12 @@ python WhileLang/Tests.py cegis
   with a parameter 'd' that represents a dictionary.
   You may use the z3-solver library operators.
 
-  For example, you can use 'And', 'Or' functions, and 'd' as a dictionary:
+  For example, you can use 'And', 'Or' operators, and 'd' as a dictionary:
 ```sh
 And(d['a'] == d['b'], Or(d['a'] > 5, d['a'] < -5))
 ```
 
-  Please make sure you are using parameters which are present in the program you have provided.
+  Please make sure to use parameters which are present in the program you have provided.
   After writing a condition, press the respective 'Set' button to set the condition.
   In addition, you can reset a condition to 'True' by clicking the respective 'Reset' button.
 
@@ -122,24 +122,28 @@ And(d['a'] == d['b'], Or(d['a'] > 5, d['a'] < -5))
   For PBE synthesizer, you may enter some input-output examples for the provided program variables.
   To open this window, press the 'Set Examples' button.
   Before opening this window, a valid program may be provided in the 'Input Program' box.
-  The synthesizer will automatically detect the program variables and will create a convenient environment for you to set the examples:
+  The tool will automatically detect the program variables and will create a convenient environment for you to set the examples.
   For example, for the following program:
 ```sh
 c1 := ?? + x ; c2 := ?? + y ; c3 := ?? + z 
 ```
   Opening the examples window will result the following setup:
+  
 ![Examples Window](Screenshots/Examples_Window.jpg)
 
   Use the 'Add Example' to create new IO example.
   Each example represented as one row.
   For each example, you can set different IO for the different variables.
   For each variable, the left input box is for the input value, and the right input box is for the output value.
+  Be sure to press the 'Save Examples' button after you set the examples.
+  If you want to delete an example, press the 'Delete' button near the example you want to delete.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ### **PBE Simple Example**:
 
   Here is an example for synthesizing a simple program with PBE, assertions, Pre-condition and 2 different IO examples:
+
 ![PBE Example](Screenshots/PBE_Usage_Example.jpg)
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
