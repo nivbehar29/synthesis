@@ -509,8 +509,8 @@ def process_assertion_program_input():
     program_text = cegis.program_input.get("1.0", tk.END).strip()  # Get text from input area
 
     # Check if the loop unrolling limit is less than 0
-    if loop_unrolling_limit < 0:
-        set_disabled_window_text_flash(cegis.message_text, "Error: Loop unrolling limit must be greater than or equal to 0.", True)
+    if loop_unrolling_limit <= 0:
+        set_disabled_window_text_flash(cegis.message_text, "Error: Loop unrolling limit must be greater than 0.", True)
         return
 
     # If interactive mode is enabled, create the interactive window

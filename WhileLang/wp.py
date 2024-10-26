@@ -132,6 +132,10 @@ class WP:
         elif node_type == "assert":
             cond = subtrees[0]
             return lambda env: And(self.eval_expr(cond, env), Q(env))
+        
+        elif node_type == "assert_unrolled":
+            cond = subtrees[0]
+            return lambda env: And(Not(self.eval_expr(cond, env)), Q(env))
         else:
             raise ValueError(f"Unknown statement type: {node_type}")
 

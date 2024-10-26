@@ -472,8 +472,8 @@ class Synthesizer:
         new_holes_dict = {}
 
         # Add bounderies for holes exploration
-        curr_lower_bound = 5
-        curr_upper_bound = -5
+        curr_lower_bound = -5
+        curr_upper_bound = 5
         holes_bound_p = self.get_bounds_condition(holes, curr_lower_bound, curr_upper_bound)
 
         # initialize iteration counter
@@ -617,8 +617,8 @@ class Synthesizer:
         new_holes_dict = {}
 
         # Add bounderies for holes exploration
-        curr_lower_bound = 5
-        curr_upper_bound = -5
+        curr_lower_bound = -5
+        curr_upper_bound = 5
         holes_bound_p = self.get_bounds_condition(holes, curr_lower_bound, curr_upper_bound)
 
         # initialize iteration counter
@@ -682,12 +682,14 @@ class Synthesizer:
 
                 final_holes_p = lambda d, p = copy.deepcopy(final_holes_p), q = copy.deepcopy(holes_p): And(p(d), Not(q(d)))
 
-            # set the final P. also add the holes bounds to it
+            # set the final P with bounds
             final_P = lambda d, p = copy.deepcopy(P), h = copy.deepcopy(final_holes_p), q = copy.deepcopy(holes_bound_p): And(p(d), h(d), q(d))
+
+            # set the final P without bounds
             final_P_no_bounds = lambda d, p = copy.deepcopy(P), h = copy.deepcopy(final_holes_p): And(p(d), h(d))
 
             # First, try to solve without holes bounds, to see if there is no solution at all.
-            if(skip == False):
+            if(skip == True):
                 print("Finding holes without bounds")
                 result, solver1 = self.find_holes(ast_holes_inputs, final_P_no_bounds, Q, linv=linv)
                 if result == False:

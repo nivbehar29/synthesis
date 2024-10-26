@@ -10,7 +10,7 @@ __all__ = ["parse"]
 class WhileParser:
 
     TOKENS = (
-        r"(if|if_unrolled|then|else|while|do|skip|assert)(?![\w\d_]) "
+        r"(if|if_unrolled|then|else|while|do|skip|assert|assert_unrolled)(?![\w\d_]) "
         r"(?P<id>[^\W\d]\w*) "
         r"(?P<num>[+\-]?\d+) "
         r"(?P<op>[!<>]=|([+\-*/<>=])) "
@@ -19,7 +19,7 @@ class WhileParser:
     )
     GRAMMAR = r"""
     S   ->   S1     |   S1 ; S
-    S1  ->   skip   |   id := E   |   if E then S else S1   |   if_unrolled E then S else S1    |   while E do S1  |   assert E
+    S1  ->   skip   |   id := E   |   if E then S else S1   |   if_unrolled E then S else S1    |   while E do S1  |   assert E   |   assert_unrolled E
     S1  ->   ( S )
     E   ->   E0   |   E0 op E0
     E0  ->   id   |   num   |   hole
@@ -57,7 +57,7 @@ class WhileParser:
             )
         elif len(t.subtrees) == 3 and t.subtrees[0].root == "(":
             return self.postprocess(t.subtrees[1])
-        elif t.root == "S1" and t.subtrees[0].root in ["if", "if_unrolled", "while", 'assert']:
+        elif t.root == "S1" and t.subtrees[0].root in ["if", "if_unrolled", "while", 'assert', 'assert_unrolled']:
             return self.postprocess(Tree(t.subtrees[0].root, t.subtrees[1::2]))
         elif t.root == "num":
             return Tree(t.root, [Tree(int(t.subtrees[0].root))])  # parse ints
@@ -83,6 +83,7 @@ def unroll_while(tree: Tree, unroll_bound: int) -> Tree:
         Tree: The new unrolled tree.
     """
     if tree.root == "while":
+        
         cond = tree.subtrees[0]
         body = tree.subtrees[1]
         
@@ -94,6 +95,10 @@ def unroll_while(tree: Tree, unroll_bound: int) -> Tree:
             next_unroll = Tree("if_unrolled", [cond, body, Tree("skip", [])])
             unrolled = Tree(";", [unrolled, next_unroll])  # Sequence them with `;`
         
+        # Add an assertion to ensure the loop terminates (the condition will be evaluated as False in WP)
+        assert_unrolled = Tree("assert_unrolled", [cond])
+        unrolled = Tree(";", [unrolled, assert_unrolled])
+
         return unrolled
     
     # Recursively unroll any other while loops inside the tree
@@ -148,6 +153,10 @@ def tree_to_program(tree: Tree) -> str:
     elif tree.root == "assert":  # Assert statement
         cond = tree_to_program(tree.subtrees[0])
         return f"assert {cond}"
+    
+    elif tree.root == "assert_unrolled":  # Assert statement
+        cond = tree_to_program(tree.subtrees[0])
+        return f"assert_unrolled {cond}"
     
     elif tree.root in ["+", "-", "*", "/", ">", "<", ">=", "<=", "==", "!=", "op", "="]:  # Binary operation
         left = tree_to_program(tree.subtrees[0])

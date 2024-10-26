@@ -12,7 +12,8 @@
 
 ## **Introduction**
 
-SynthGUI is a graphical user interface for synthesizing programs using PBE (Programming by Examples) and CEGIS (Counterexample-Guided Inductive Synthesis) approach. This project is built using Python.
+SynthGUI is a graphical user interface for synthesizing programs using PBE (Programming by Examples) and CEGIS (Counterexample-Guided Inductive Synthesis) approaches.
+This project is built using Python.
 The programs synthesized by SynthGUI follow the syntax of the WhileLang language.
 
 
@@ -40,10 +41,20 @@ Tooltips provide additional information about various elements in the GUI. They 
 
 ## **Usage**
 
-**Running the GUI**:
+**Running The GUI**:
 To run the GUI, execute the following command:
 ```sh
-python SynthGUI.py
+python WhileLang/SynthGUI.py
+```
+
+**Running The Tests**:
+To run the pbe tests, execute the following command:
+```sh
+python WhileLang/Tests.py pbe
+```
+To run the CEGIS tests, execute the following command:
+```sh
+python WhileLang/Tests.py cegis
 ```
 
 **General GUI Description**:
@@ -139,3 +150,124 @@ c1 := ?? + x ; c2 := ?? + y ; c3 := ?? + z
  **You can hover the lables of each element to see a description of its purposes.**
 
  ![Interactive CEGIS](Screenshots/Interactive_CEGIS.jpg)
+
+## **Interesting Cases:**:
+
+### **Playing With Unroll Limit**:
+
+ When unrolling loops, we can sometimes run into cases where the synthesizer outputs different results for the same program.
+ Here, we are going to demonstrate some of this cases, and analayze the different possibilities.
+
+ Lets examine the following program:
+```sh
+y := 0 ; x := 0 ; t := ?? ; while x < t do ( y := y + ?? ; x := x + ??) ; assert y = 6 
+```
+
+ Now, lets give the holes some names:
+```sh
+y := 0 ; x := 0 ; t := hole_t ; while x < t do ( y := y + hole_y ; x := x + hole_x) ; assert y = 6 
+```
+
+ We know that the final result of 'y' should be 6.
+ There are actually infinite solutions to this problem, for example:
+ let hole_y be 1. we can set hole_x and hole_t to any values which satisfy the condition: 
+```sh
+hole_t = 6 * hole_x, hole_x > 0
+```
+
+ This way, we have infinite number of solutions which satisfy the condition that y = 6 in the end of the program.
+ For this reason, we might want to set some boundaries for the holes - so we can analayze what we can get and how the synthesizer might react:
+```sh
+"y := 0 ; x := 0 ; t := ?? ; while x < t do ( y := y + ?? ; x := x + ??) ; assert y = 6 ; assert x <= 6 ; assert x >= 0 ; assert t <= 6"
+```
+
+ This way we have a finite number of solutions, here they are:
+```sh
+y := 0 ; x := 0 ; t := 1 ; while x < t do ( y := y + 6 ; x := x + 1)
+y := 0 ; x := 0 ; t := 2 ; while x < t do ( y := y + 3 ; x := x + 1)
+y := 0 ; x := 0 ; t := 3 ; while x < t do ( y := y + 2 ; x := x + 1)
+y := 0 ; x := 0 ; t := 6 ; while x < t do ( y := y + 1 ; x := x + 1)
+
+y := 0 ; x := 0 ; t := 1 ; while x < t do ( y := y + 6 ; x := x + 2)
+y := 0 ; x := 0 ; t := 2 ; while x < t do ( y := y + 6 ; x := x + 2)
+y := 0 ; x := 0 ; t := 3 ; while x < t do ( y := y + 3 ; x := x + 2)
+y := 0 ; x := 0 ; t := 4 ; while x < t do ( y := y + 3 ; x := x + 2)
+y := 0 ; x := 0 ; t := 5 ; while x < t do ( y := y + 2 ; x := x + 2)
+y := 0 ; x := 0 ; t := 6 ; while x < t do ( y := y + 2 ; x := x + 2)
+
+y := 0 ; x := 0 ; t := 1 ; while x < t do ( y := y + 6 ; x := x + 3)
+y := 0 ; x := 0 ; t := 2 ; while x < t do ( y := y + 6 ; x := x + 3)
+y := 0 ; x := 0 ; t := 3 ; while x < t do ( y := y + 6 ; x := x + 3)
+y := 0 ; x := 0 ; t := 4 ; while x < t do ( y := y + 3 ; x := x + 3)
+y := 0 ; x := 0 ; t := 5 ; while x < t do ( y := y + 3 ; x := x + 3)
+y := 0 ; x := 0 ; t := 6 ; while x < t do ( y := y + 3 ; x := x + 3)
+
+y := 0 ; x := 0 ; t := 1 ; while x < t do ( y := y + 6 ; x := x + 4)
+y := 0 ; x := 0 ; t := 2 ; while x < t do ( y := y + 6 ; x := x + 4)
+y := 0 ; x := 0 ; t := 3 ; while x < t do ( y := y + 6 ; x := x + 4)
+y := 0 ; x := 0 ; t := 4 ; while x < t do ( y := y + 6 ; x := x + 4)
+y := 0 ; x := 0 ; t := 5 ; while x < t do ( y := y + 3 ; x := x + 4)
+y := 0 ; x := 0 ; t := 6 ; while x < t do ( y := y + 3 ; x := x + 4)
+
+y := 0 ; x := 0 ; t := 1 ; while x < t do ( y := y + 6 ; x := x + 5)
+y := 0 ; x := 0 ; t := 2 ; while x < t do ( y := y + 6 ; x := x + 5)
+y := 0 ; x := 0 ; t := 3 ; while x < t do ( y := y + 6 ; x := x + 5)
+y := 0 ; x := 0 ; t := 4 ; while x < t do ( y := y + 6 ; x := x + 5)
+y := 0 ; x := 0 ; t := 5 ; while x < t do ( y := y + 6 ; x := x + 5)
+y := 0 ; x := 0 ; t := 6 ; while x < t do ( y := y + 3 ; x := x + 5)
+
+y := 0 ; x := 0 ; t := 1 ; while x < t do ( y := y + 6 ; x := x + 6)
+y := 0 ; x := 0 ; t := 2 ; while x < t do ( y := y + 6 ; x := x + 6)
+y := 0 ; x := 0 ; t := 3 ; while x < t do ( y := y + 6 ; x := x + 6)
+y := 0 ; x := 0 ; t := 4 ; while x < t do ( y := y + 6 ; x := x + 6)
+y := 0 ; x := 0 ; t := 5 ; while x < t do ( y := y + 6 ; x := x + 6)
+y := 0 ; x := 0 ; t := 6 ; while x < t do ( y := y + 6 ; x := x + 6)
+```
+
+ For the synthesizer to output one of this solutions, its enough to set the unroll limit to be 6.
+ But, if we set the unroll limit to less than that, the number of solution decreases.
+ For example, if we set the unroll limit to 1, then the program is equivalent to the following program:
+```sh
+"y := 0 ; x := 0 ; t := hole_t ; if x < t then ( y := y + hole_y ; x := x + hole_x) else skip ; assert x >= t ; assert y = 6 ; assert x <= 6 ; assert x >= 0 ; assert t <= 6"
+```
+
+**Notice that we have added another assertion after the 'skip' statement, which ensures that the 'while' condition doesn't hold when it's done.**
+ Anyway, for this program, its easy to see that hole_y has to be filled with 6.
+ As for hole_t and hole_x, here are the possible solutions:
+```sh
+y := 0 ; x := 0 ; t := 1 ; while x < t do ( y := y + 6 ; x := x + 1)
+
+y := 0 ; x := 0 ; t := 1 ; while x < t do ( y := y + 6 ; x := x + 2)
+y := 0 ; x := 0 ; t := 2 ; while x < t do ( y := y + 6 ; x := x + 2)
+
+y := 0 ; x := 0 ; t := 1 ; while x < t do ( y := y + 6 ; x := x + 3)
+y := 0 ; x := 0 ; t := 2 ; while x < t do ( y := y + 6 ; x := x + 3)
+y := 0 ; x := 0 ; t := 3 ; while x < t do ( y := y + 6 ; x := x + 3)
+
+y := 0 ; x := 0 ; t := 1 ; while x < t do ( y := y + 6 ; x := x + 4)
+y := 0 ; x := 0 ; t := 2 ; while x < t do ( y := y + 6 ; x := x + 4)
+y := 0 ; x := 0 ; t := 3 ; while x < t do ( y := y + 6 ; x := x + 4)
+y := 0 ; x := 0 ; t := 4 ; while x < t do ( y := y + 6 ; x := x + 4)
+
+y := 0 ; x := 0 ; t := 1 ; while x < t do ( y := y + 6 ; x := x + 5)
+y := 0 ; x := 0 ; t := 2 ; while x < t do ( y := y + 6 ; x := x + 5)
+y := 0 ; x := 0 ; t := 3 ; while x < t do ( y := y + 6 ; x := x + 5)
+y := 0 ; x := 0 ; t := 4 ; while x < t do ( y := y + 6 ; x := x + 5)
+y := 0 ; x := 0 ; t := 5 ; while x < t do ( y := y + 6 ; x := x + 5)
+
+y := 0 ; x := 0 ; t := 1 ; while x < t do ( y := y + 6 ; x := x + 6)
+y := 0 ; x := 0 ; t := 2 ; while x < t do ( y := y + 6 ; x := x + 6)
+y := 0 ; x := 0 ; t := 3 ; while x < t do ( y := y + 6 ; x := x + 6)
+y := 0 ; x := 0 ; t := 4 ; while x < t do ( y := y + 6 ; x := x + 6)
+y := 0 ; x := 0 ; t := 5 ; while x < t do ( y := y + 6 ; x := x + 6)
+y := 0 ; x := 0 ; t := 6 ; while x < t do ( y := y + 6 ; x := x + 6)
+```
+ 
+ Although we have less results to get, there are still quite amount of them,
+ and we can get one of them with less time of synthesis because we unrolled the loop only once.
+
+ The above analysis gives us several insights regarding the act of lowering the unroll limit:
+ 1. When we set the unroll limit to a smaller value, the synthesizing process will be faster.
+ 2. We can limit the amount of loops we want to execute, which leads to a program that run faster, and still outputs a valid solution.
+ 3. We can use the advantage of limiting the loop amount, to get different results.
+ 

@@ -1,5 +1,5 @@
 from pbe_tests import *
-from assert_tests import *
+from cegis_tests import *
 import sys
 
 def main(args):
@@ -13,15 +13,11 @@ def main(args):
 
     if case == "pbe":
         pbe_tests()
-    elif case == "assert":
-        assert_tests()
+    elif case == "cegis":
+        cegis_tests()
     else:
         print("Invalid case selected.")
 
 if __name__ == "__main__":
     arguments = sys.argv[1:]
     main(arguments)
-
-    
-def assert_tests():
-    print("assert tests")
