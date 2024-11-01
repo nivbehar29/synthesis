@@ -169,38 +169,42 @@ def replace_listbox_items_dict(listbox: tk.Listbox, dic : dict):
 
 def next_step(tab: CEGIS_Tab, to_disable_prints = True):
 
+    # Post process function to flash the changed elements in the GUI after each step
+    flash_post_process = None
+
     # Here, perform the last step that was actually done
     last_state = tab.last_step[0]
 
     if last_state == "State_0":
         if len(tab.last_step) >= 3:
             program = tab.last_step[2]
-            set_disabled_window_text_flash_2(tab.current_program_text_box, program, 'yellow', 'white')
+            flash_post_process = lambda : set_disabled_window_text_flash_2(tab.current_program_text_box, program, 'yellow', 'white')
 
     if last_state == "State_1":
         program_with_holes = tab.last_step[2]
-        set_disabled_window_text_flash_2(tab.holes_program_text_box, program_with_holes, 'yellow', 'white')
+        flash_post_process = lambda : set_disabled_window_text_flash_2(tab.holes_program_text_box, program_with_holes, 'yellow', 'white')
     
     elif last_state == "State_2":
         new_holes_dict = tab.last_step[3]
         replace_listbox_items_dict(tab.current_holes_box, new_holes_dict)
-        flash_text_widget(tab.current_holes_box, 'white', 'yellow')
+        # flash_text_widget(tab.current_holes_box, 'white', 'yellow')
 
         program_with_zeros = tab.last_step[2]
-        set_disabled_window_text_flash_2(tab.current_program_text_box, program_with_zeros, 'yellow', 'white')
+        flash_post_process = lambda : (set_disabled_window_text_flash_2(tab.current_program_text_box, program_with_zeros, 'yellow', 'white'),
+                                 flash_text_widget(tab.current_holes_box, 'white', 'yellow'))
 
 
     elif last_state == "State_3_1":
         result = tab.last_step[2]
         if result == True:
-            set_disabled_window_text_flash_2(tab.interactive_message_text, f"Verification secceeded. The synthesized program will be presented in the 'Current program' window", 'lightgreen', 'white')
+            flash_post_process = lambda : set_disabled_window_text_flash_2(tab.interactive_message_text, f"Verification secceeded. The synthesized program will be presented in the 'Current program' window", 'lightgreen', 'white')
         else:
-            set_disabled_window_text_flash_2(tab.interactive_message_text, f"Verification failed", 'red2', 'white')
+            flash_post_process = lambda : set_disabled_window_text_flash_2(tab.interactive_message_text, f"Verification failed", 'red2', 'white')
 
 
     elif last_state == "State_3_2":
         filled_program = tab.last_step[2]
-        set_disabled_window_text_flash_2(tab.current_program_text_box, filled_program, 'lightgreen', 'white')
+        flash_post_process = lambda : set_disabled_window_text_flash_2(tab.current_program_text_box, filled_program, 'lightgreen', 'white')
         finish_interactive_process(tab)
 
     elif last_state == "State_3_3":
@@ -208,27 +212,29 @@ def next_step(tab: CEGIS_Tab, to_disable_prints = True):
         
         # Add the excluded holes to the listbox
         tab.excluded_holes_list_box.insert(tk.END, str(tab.excluded_holes_list_box.size() + 1) + ". " + str(excluded_holes_dict))
-        flash_text_widget(tab.excluded_holes_list_box, 'white', 'yellow')
+        # flash_text_widget(tab.excluded_holes_list_box, 'white', 'yellow')
 
         # Scroll to the end of the listbox
         tab.excluded_holes_list_box.see(tk.END)
 
         # Set the counter example in the message box
         counter_example = tab.last_step[2]
-        set_disabled_window_text_flash_2(tab.interactive_message_text, f"Counter example: {counter_example}", 'yellow', 'white')
+        flash_post_process = lambda : (set_disabled_window_text_flash_2(tab.interactive_message_text, f"Counter example: {counter_example}", 'yellow', 'white'),
+                                 flash_text_widget(tab.excluded_holes_list_box, 'white', 'yellow'))
 
     elif last_state == "State_4_2":
-        set_disabled_window_text_flash_2(tab.interactive_message_text, f"Couldn't find new holes - program is not solvable.\nFinish process.", 'red2', 'white')
+        flash_post_process = lambda : set_disabled_window_text_flash_2(tab.interactive_message_text, f"Couldn't find new holes - program is not solvable.\nFinish process.", 'red2', 'white')
         finish_interactive_process(tab)
 
     elif last_state == "State_5":
         new_holes_dict = tab.last_step[3]
         replace_listbox_items_dict(tab.current_holes_box, new_holes_dict)
-        flash_text_widget(tab.current_holes_box, 'white', 'yellow')
+        # flash_text_widget(tab.current_holes_box, 'white', 'yellow')
 
         filled_program = tab.last_step[2]
         # Display the filled program in the output text box
-        set_disabled_window_text_flash_2(tab.current_program_text_box, filled_program, 'yellow', 'white')
+        flash_post_process = lambda : (set_disabled_window_text_flash_2(tab.current_program_text_box, filled_program, 'yellow', 'white'),
+                                flash_text_widget(tab.current_holes_box, 'white', 'yellow'))
 
 
     # Now, perform the next step
@@ -257,8 +263,12 @@ def next_step(tab: CEGIS_Tab, to_disable_prints = True):
         error = f"An unexpected error occurred: {e}"
 
     if(error != ""):
-        set_disabled_window_text_flash_2(tab.interactive_message_text, error, 'red2', 'white')
+        flash_post_process = lambda: set_disabled_window_text_flash_2(tab.interactive_message_text, error, 'red2', 'white')
         finish_interactive_process(tab)
+    
+    # Flash 
+    if flash_post_process:
+        flash_post_process()
 
 
 def abort(tab: CEGIS_Tab):
@@ -476,7 +486,7 @@ def get_final_result(synth_result, program_text):
     elif isinstance(synth_result, Synthesizer.ProgramHasNoHoles):
         error = "Message: Program has no holes. You can try to verify your program."
         print("synthesis result:", program_text)
-        final_output = remove_assertions_program(program_text)
+        final_output = program_text # remove_assertions_program(program_text)
     elif isinstance(synth_result, Synthesizer.ProgramNotVerified):
         error = "Error: The program can't be verified for all possible inputs. If this is not the excpected outcome:\n "
         error += "1. Try increasing the loop unrolling limit.\n"
@@ -488,7 +498,7 @@ def get_final_result(synth_result, program_text):
         error = f"An unexpected error occurred: {synth_result}"
     else:
         print("synthesis result:", synth_result)
-        final_output = remove_assertions_program(synth_result)
+        final_output = synth_result # remove_assertions_program(synth_result)
 
     return final_output, error
 

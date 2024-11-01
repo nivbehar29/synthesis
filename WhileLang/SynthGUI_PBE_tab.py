@@ -391,7 +391,7 @@ def process_pbe_program_input():
                 if(final_output != ""):
                     if(error == ""):
                         set_disabled_window_text_flash(pbe.message_text, "The program has been synthesized successfully", False)
-                    set_disabled_window_text(pbe.output_text, remove_assertions_program(final_output))
+                    set_disabled_window_text(pbe.output_text, final_output)
                     pbe.verify_program_button.config(state='normal')  # Enable the button
 
     check_process()

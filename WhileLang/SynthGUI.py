@@ -13,11 +13,11 @@ from SynthGUI_PBE_tab import *
 # Initialize the main window
 root = tk.Tk()
 root.title("Synthesizer")
-root.geometry("800x900")  # Increased height to accommodate both input and output areas
+root.geometry("1300x730")  # Increased height to accommodate both input and output areas
 
 # Create a Notebook for tabs
 notebook = ttk.Notebook(root)
-notebook.pack(pady=10, expand=True, fill="both")
+notebook.pack(pady=10, expand=False, fill="both")
 
 # Frame for Program by Example (PBE)
 pbe_frame = ttk.Frame(notebook, width=800, height=600)
@@ -49,34 +49,47 @@ loop_unrolling_entry.pack(side=tk.LEFT)
 # Add a tooltip for the loop unrolling entry
 CreateToolTip(loop_unrolling_entry, tool_tips_dict["Loop_Unrolling_Entry"])
 
-# Label for the output section
-output_label = tk.Label(root, text="Input Program:", font=("Helvetica", 14))
+# Set a sperate frame for program section and messages section
+program_messages_frame = tk.Frame(root)
+program_messages_frame.pack(pady=10, padx=10)
+
+# Set a saparate frame for program section
+program_frame = tk.Frame(program_messages_frame)
+program_frame.pack(side=tk.LEFT, padx=5)
+
+# Label for the program section
+output_label = tk.Label(program_frame, text="Input Program:", font=("Helvetica", 14))
 output_label.pack(pady=0)
 
 # Create scrollable input text widget with reduced width
-program_input = create_scrollable_text(root, height=7, width=80)  # Reduced width from 90 to 80
+program_input = create_scrollable_text(program_frame, height=7, width=80)  # Reduced width from 90 to 80
 
 # Label for the output section
-output_label = tk.Label(root, text="Synthesis Output Program:", font=("Helvetica", 14))
+output_label = tk.Label(program_frame, text="Synthesis Output Program:", font=("Helvetica", 14))
 output_label.pack(pady=0)
 
 # Create scrollable output text widget with reduced width
-output_text = create_scrollable_text(root, height=7, width=80)  # Reduced width from 90 to 80
+output_text = create_scrollable_text(program_frame, height=7, width=80)  # Reduced width from 90 to 80
 
 # Insert initial text
 output_text.config(state='normal')  # Temporarily make the output editable
 output_text.insert('1.0', "Output program")  # Add initial text
 output_text.config(state='disabled')  # Make the output non-editable again
 
+# Set a saparate frame for program section
+messages_frame = tk.Frame(program_messages_frame)
+messages_frame.pack(side=tk.LEFT, padx=5)
+
 # Add a section for error messages below the output_text
-message_label = tk.Label(root, text="Messages:", font=("Helvetica", 12, "bold"))
+message_label = tk.Label(messages_frame, text="Messages:", font=("Helvetica", 12, "bold"))
 message_label.pack(pady=10)
 
 # message_text = create_scrollable_text(root, height=7, width=80)  # Reduced width from 90 to 80
 # message_text.config(wrap='word', bg='lightgray')  # Wrap text at word boundaries
 
-message_text = tk.Text(root, height=7, width=80, wrap='word', bg='lightgray')
-message_text.pack(padx=20, pady=(0, 10))
+message_text = tk.Text(messages_frame, height=14, width=80, wrap='word', bg='lightgray')
+# message_text.pack(padx=20, pady=(0, 10))
+message_text.pack(side=tk.LEFT, padx=20)
 message_text.config(state='disabled')  # Make the output non-editable again
 
 # ------------------------------

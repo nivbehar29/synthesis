@@ -4,7 +4,7 @@ from z3 import ForAll, Implies, Not, And, Or
 import os
 from contextlib import redirect_stdout
 from wp import verify
-from syntax.while_lang import parse
+from syntax.while_lang import parse, remove_assertions_program
 
 # ------------------------------
 # ToolTip
@@ -25,7 +25,8 @@ tool_tips_dict = {
     ),
 
     "Verify_Output_Button": (
-        "Click to verify the output program using the provided Conditions."
+        "Click to verify the output program using the provided Conditions.\n"
+        "Note: assertions will not take place during the verification process"
     ),
 
     "Loop_Unrolling_Entry": (
@@ -194,6 +195,7 @@ def verify_output_program(tab):
     tab.message_text.delete('1.0', tk.END)  # Clear previous output
 
     program_text = tab.output_text.get("1.0", tk.END).strip()  # Get text from output area
+    program_text = remove_assertions_program(program_text)  # Remove assertions from the program
 
     queue = multiprocessing.Queue()
     process = multiprocessing.Process(target = run_verifier, args=(program_text, queue, tab.P_str, tab.Q_str, tab.linv_str))
@@ -438,7 +440,7 @@ def eval_conditions(P_str, Q_str, linv_str):
     return P, Q, linv
 
 # Function to flash a text widget
-def flash_text_widget(text_widget, original_color, flash_color="yellow", flash_duration=500):
+def flash_text_widget(text_widget, original_color, flash_color="yellow", flash_duration=2000):
     # Change to the flash color
     text_widget.config(bg=flash_color)
 

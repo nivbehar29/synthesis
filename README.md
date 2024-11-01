@@ -4,25 +4,32 @@
 ## **Table of Contents**
 
 1. [Introduction](#introduction)
-2. [Features](#Features)
+2. [Features](#features)
 3. [Usage](#usage)
     - [General GUI Description](#general-gui-description)
-    - [Set Conditions Window](#Set-Conditions-Window)
-    - [Set Examples Window](#Set-Examples-Window)
-    - [PBE Simple Example](#PBE-Simple-Example)
-    - [CEGIS Synthesizer](#CEGIS-Synthesizer)
-    - [CEGIS Interactive Mode](#CEGIS-Interactive-Mode)
-4. [Interesting Cases](#Interesting-Cases)
-    - [Playing With Unroll Limit](#Playing-With-Unroll-Limit)
-    - [Diverging & Unrealizable Programs](#Diverging-&-Unrealizable-Programs)
+    - [Set Conditions Window](#set-conditions-window)
+    - [Set Examples Window](#set-examples-window)
+    - [PBE Simple Example](#pbe-simple-example)
+    - [CEGIS Synthesizer](#cegis-synthesizer)
+    - [CEGIS Interactive Mode](#cegis-interactive-mode)
+4. [Interesting Cases](#interesting-cases)
+    - [Interactive-Mode Example](#interactive-mode-example)
+    - [Interactive Mode Debug](#using-interactive-mode-to-debug-issues-with-unroll-limit)
+    - [Unroll limit Analysis](#unroll-limit-analysis)
+    - [Diverging & Unrealizable Programs](#diverging--unrealizable-programs)
 
 ---
 
 ## **Introduction**
 
 SynthGUI is a graphical user interface for synthesizing programs using PBE (Programming by Examples) and CEGIS (Counterexample-Guided Inductive Synthesis) approaches.
-The programs synthesized by SynthGUI follow the syntax of the WhileLang language.
-In addition to synthesize different programs, the purpose of this project is to give the user an environment where he can get some good feedback for all the different kinds of operations and scenarios happens during the synthesis process.
+The synthesizer can fill holes in a given program to satisfy conditions which are be defined by the user.
+The conditions comes within pre/post conditions, or within assertions inside the program itself.
+After the synthesis process is done, an output program will be presented. The output program can be verified by the user.
+
+The programs follow the syntax of the WhileLang language.
+
+In addition, the purpose of this project is to give the user an environment where he can set the different specifications in a firendly way, and get some good feedback for all the different kinds of operations and scenarios happens during the synthesis process.
 
 This project is built using Python 3.11.3.
 
@@ -39,6 +46,7 @@ This feature uses the CEGIS approach to synthesize programs. It iteratively refi
 - **Assertions**:
 Assertions are used to specify properties that the synthesized program must satisfy. These assertions are part of the syntax of the programs provided by the user.
 The synthesizer will generate a program that meets these assertions, ensuring that the synthesized program behaves as expected according to the specified properties.
+Note: assertions will only take place during the synthesizing process, but not in the verification process.
 
 - **Loops Handling in Synthesis**:
 This feature handles loops in the synthesis process by unrolling loops. Loop unrolling helps in dealing with loops by expanding them into a sequence of repeated statements.
@@ -87,7 +95,8 @@ python WhileLang/Tests.py cegis
 <li><strong><em>Set conditions button (P, Q, Linv)</em></strong> - Opens a new window to set pre\post-conditions, and loop invariant.</li>
 <li><strong><em>Set examples button</em></strong> (PBE synthesizer only) - Opens a window where you can set input-output examples.</li>
 <li><strong><em>Senthesize button</em></strong> - Synthesize the given program.</li>
-<li><strong><em>Verify output program button</em></strong> - Use it to verify the output program.</li>
+<li><strong><em>Verify output program button</em></strong> - Use it to verify the output program. Note: asssertion will only take place during the synthesizing process, but not in the verification process.
+</li>
 <li><strong><em>Loop unrolling limit box</em></strong> - Sets the value of how many times the synthesizer should unroll a loop (10 by default).</li>
 <li><strong><em>Input program text box</em></strong> - Here you may enter the program you want to synthesize.</li>
 <li><strong><em>Output program box</em></strong> - Shows the synthesized program. This program can be verified by pressing the 'Verify output program' button.</li>
@@ -179,11 +188,93 @@ c1 := ?? + x ; c2 := ?? + y ; c3 := ?? + z
 
  ![Interactive CEGIS](Screenshots/Interactive_CEGIS.jpg)
 
+Start by trying this example for getting a feeling with the interactive mode: [Interactive-Mode Example](#Interactive-Mode-Example)
+
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ## **Interesting Cases**
 
-### **Playing With Unroll Limit**:
+## **Interactive-Mode Example**
+Try the following program to see the interactive mode in action:
+```sh
+d := 1;
+c0 := ??;
+c1 := ??;
+c2 := ??;
+if c0 = 0 then if x = 1 then d := 0 else skip else skip;
+if c1 = 0 then if x = 2 then d := 0 else skip else skip;
+if c2 = 0 then if x = 3 then d := 0 else skip else skip;
+assert d = 1
+```
+For this program, the synthesizer will detect counter examples multiple times while filling the holes.
+This is a good example for learning\teaching the cegis algorithm using the interactive mode.
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+### **Using Interactive-Mode To Debug Issues With Unroll Limit**:
+
+Consider the following program:
+```sh
+a := b ; while i < n do ( a := a + 1 ; b := b + 1 ; i := i + 1) ; c1 := ??
+```
+Note: the hole is unnecessary, but its there because the synthesizer doesn't synthesizes programs without holes.
+
+Lets define some conditions for this program:
+```sh
+# Loop Invariant
+d["a"] == d["b"]
+
+# Pre-Condition
+And(d["i"] >= 0, d["i"] <= d["n"])
+
+# Post-Condition
+d["a"] == d["b"]
+```
+
+And lets say the unrolling limit is set to 4.
+
+If we try to synthesize this program with CEGIS, we will get an error that says the program can be synthesize in such a way that it will be valid for all possible inputs.
+
+We can try synthesizing using the Interactive-Mode to get some more information.
+While doing it, we will see that the synthesizer finds a counter example for the program:
+```sh
+Counter example: {'n': 11, 'i': 0}
+```
+
+This counter example is ofcourse nonsense, because the program should indeed satisfy the conditions for such input.
+So, why do we get it?
+
+When unrolling a loop, we are converting it to a series of 'if' statements, like so:
+```sh
+# lets say loop unrolling limit = 4
+while i < n do ( a := a + 1 ) ;
+
+# unrolling conversion:
+if i < n then a := a + 1 else skip ;
+if i < n then a := a + 1 else skip ; 
+if i < n then a := a + 1 else skip ; 
+if i < n then a := a + 1 else skip ;
+assert not(i < n)
+```
+
+Notice the assertion in the end of the converted program. It's there because we need to make sure that the 'while' condition does not hold after the program exists the 'while' loop.
+Unfortunately, this assertion is what causes us the failure when synthesizing.
+Loop unrolling limit of 4, i = 0, n = 11, will always lead this assertion to be False.
+
+Therfore, we need to add another pre-condition to fix this issue.
+We can do it by set the following pre-condition:
+```sh
+# Pre-Condition (after addition of d["n"] <= 4)
+And(d["i"] >= 0, d["n"] <= 4, d["i"] <= d["n"])
+```
+
+After that, the synthsizer will be able to synthesize the program.
+
+We have introduced this example for you to get some sense of what is going on when getting some unexpected results.
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+### **Unroll Limit Analysis**:
 
  When unrolling loops, we can sometimes run into cases where the synthesizer outputs different results for the same program.
  Here, we are going to demonstrate some of this cases, and analayze the different possibilities.
