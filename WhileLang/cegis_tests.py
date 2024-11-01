@@ -1,7 +1,6 @@
 from Synthesizer import *
 import os
 from contextlib import redirect_stdout
-import inspect
 from wp import verify
 
 RED = "\033[31m"
@@ -168,17 +167,23 @@ def holes_basic_case_2():
 
     return test_synth_program(program, P, Q, linv, expected_program, expected_error, disable_prints)
 
-# def holes_basic_not_so_basic():
-#     program = "c1 := ?? ; c2 := ?? ; a := c1 * x ; b := c2 + 2 ; a := a + b; c := x + x ; assert(a != c)"
-
-#     P = lambda d: True
-#     Q = lambda d: True
-#     linv = lambda d: True
-
-#     expected_program = "c1 := 2 ; c2 := 1 ; a := c1 * x ; b := c2 - 1 ; a := a + b; c := x + x ; assert(a = c)"
-#     expected_error = NoErrorExcpected
-
+# excluded because it may give deifferent results so its may be hard to test. but seems it works fine.
 def holes_basic_case_3():
+    program = "c1 := ?? ; c2 := ?? ; a := c1 * x ; b := c2 + 2 ; a := a + b; c := x + x ; assert(a != c)"
+
+#  c1 * x + c2 + 2 != 2x
+# -x -1 +2 != 2x
+    P = lambda d: True
+    Q = lambda d: True
+    linv = lambda d: True
+
+    expected_program = "c1 := -1 ; c2 := -1 ; a := c1 * x ; b := c2 + 2 ; a := a + b; c := x + x ; assert(a != c)"
+    expected_error = NoErrorExcpected
+
+    return test_synth_program(program, P, Q, linv, expected_program, expected_error, disable_prints)
+
+
+def holes_basic_case_4():
     program = "x := 2 * ?? ; if x = 6 then y := 4 else skip ; assert y = 4"
 
     P = lambda d: True
@@ -190,7 +195,7 @@ def holes_basic_case_3():
 
     return test_synth_program(program, P, Q, linv, expected_program, expected_error, disable_prints)
 
-def holes_basic_case_4():
+def holes_basic_case_5():
     program = "x := 8 + ?? ; z:= x + 8;  if z = 20 then y := 8 else y := 5; assert y = 8"
 
     P = lambda d: True
@@ -202,7 +207,7 @@ def holes_basic_case_4():
 
     return test_synth_program(program, P, Q, linv, expected_program, expected_error, disable_prints)
 
-def holes_basic_case_5():
+def holes_basic_case_6():
     program = "x:= 2; y:= ?? ; assert (y - 1) > x; if (y - 3) = 5 then x := x + ?? else x:= x + 2 ; assert (x = 5)"
 
     P = lambda d: True
@@ -214,7 +219,7 @@ def holes_basic_case_5():
 
     return test_synth_program(program, P, Q, linv, expected_program, expected_error, disable_prints)
 
-def holes_basic_case_6():
+def holes_basic_case_7():
     program = "x := 8 + ?? ; if z = (y + ??) then y := 20 - x else y := 5; assert y = 8"
 
     P = lambda d: And(d["y"] > 0 , d["z"] > 0)
@@ -226,7 +231,7 @@ def holes_basic_case_6():
 
     return test_synth_program(program, P, Q, linv, expected_program, expected_error, disable_prints)
 
-def holes_basic_case_7():
+def holes_basic_case_8():
     program = "x:= 3; y:= ??; assert ((y - 1) > x); if (y - 3) = 5 then x := x + ?? else x:= x + 6"
 
     P = lambda d: True
@@ -237,68 +242,6 @@ def holes_basic_case_7():
     expected_error = NoErrorExcpected
 
     return test_synth_program(program, P, Q, linv, expected_program, expected_error, disable_prints)
-
-# d := 0;
-# c1 := ?? ;
-# if c1 = 1 then (if x = 0 then d := 1 else skip) else skip ;
-# if c1 = 1 then (if x = 1 then d := 0 else skip) else skip ;
-
-# if c1 = 2 then (if x = 0 then d := 1 else skip) else skip ;
-# if c1 = 2 then (if x = 1 then d := 0 else skip) else skip ;
-
-# if c1 = 3 then d := 1 else skip ;
-
-# assert d = 1
-
-
-
-# d := 0;
-# c1 := ?? ;
-# c2 := ?? ;
-# if c1 = 1 then ( if c2 = 0 then (if x = 0 then d := 0 else skip) else skip) else skip ;
-# if c1 = 1 then ( if c2 = 1 then (if x = 1 then d := 0 else skip) else skip) else skip ;
-# if c1 = 1 then ( if c2 = 2 then (if x = 2 then d := 0 else skip) else skip) else skip ;
-# if c1 = 1 then ( if c2 = 3 then (if x = 3 then d := 0 else skip) else skip) else skip ;
-# if c1 = 1 then ( if c2 = 4 then d := 1 else skip) else skip ;
-# if c1 = 1 then ( if c2 = 5 then d := 1 else skip) else skip ;
-
-# if c2 = 4 then (if x = 1 then d := 0 else skip) else skip ;
-# if c2 = 5 then (if x = 1 then d := 1 else skip) else skip ;
-
-# assert d = 1
-
-
-# a := ??;
-# assert a = 11 ;
-# a := ??;
-# assert a = 13 ;
-# a := ??;
-# assert a = 14 ;
-# a := ??;
-# assert a = 15 ;
-# a := ??;
-# assert a = 16 ;
-# a := ??;
-# assert a = 17 ;
-# a := ??;
-# assert a = 18 ;
-# a := ??;
-# assert a = 11 ;
-# a := ??;
-# assert a = 11 ;
-# a := ??;
-# assert a = 11 ;
-# a := ??;
-# assert a = 12 ;
-# a := ??;
-# assert a = 19 ;
-# a := ??;
-# assert a = 12 ;
-# a := ??;
-# assert a = 13
-
-
-
 
 def holes_no_sol_case_1():
     program = "y:= x + ?? ; if y = 10 then x := 5 else x := 9"
@@ -521,6 +464,7 @@ def unroll_limit_case_2():
     print(f"unroll_limit = {unroll_limit}")
     return test_synth_program(program, P, Q, linv, expected_program, expected_error, disable_prints, unroll_limit)
 
+# Just a playground for testing
 def playground():
     program = "y := 0 ; x := 0 ; t := ?? ; while x < t do ( y := y + 1 ; x := x + 1)  ; assert y = 10"
     # thats a problem because currently we unroll loop 10 times, and only then the program can be satisfied
@@ -581,17 +525,17 @@ def cegis_tests():
     holes_basic_cases = [
         holes_basic_case_1,
         holes_basic_case_2,
-        holes_basic_case_3,
         holes_basic_case_4,
         holes_basic_case_5,
         holes_basic_case_6,
         holes_basic_case_7,
+        holes_basic_case_8,
     ]
 
     holes_no_sol_cases = [
         holes_no_sol_case_1,
         holes_no_sol_case_2,
-        # holes_no_sol_case_3, #TODO: fix this test
+        # holes_no_sol_case_3, # Can't be solved by the current CEGIS algorithm
     ]
 
     holes_while_cases = [
@@ -619,6 +563,7 @@ def cegis_tests():
     test_cases += errors_cases
     test_cases += unroll_limit_cases
 
+    # Use this for debugging
     # test_cases += [playground]
 
     results = []
