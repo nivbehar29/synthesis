@@ -21,8 +21,10 @@
 ## **Introduction**
 
 SynthGUI is a graphical user interface for synthesizing programs using PBE (Programming by Examples) and CEGIS (Counterexample-Guided Inductive Synthesis) approaches.
-This project is built using Python.
 The programs synthesized by SynthGUI follow the syntax of the WhileLang language.
+In addition to synthesize different programs, the purpose of this project is to give the user an environment where he can get some good feedback for all the different kinds of operations and scenarios happens during the synthesis process.
+
+This project is built using Python 3.11.3.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -299,7 +301,7 @@ y := 0 ; x := 0 ; t := 6 ; while x < t do ( y := y + 6 ; x := x + 6)
  2. We can limit the amount of loops we want to execute, which leads to a program that run faster, and still outputs a valid solution.
  3. We can use the advantage of limiting the loop amount, to get different results.
  
- In addition, its interesting that the synthesizer can give us different results, even if we don't change the unroll limit (Try the above program with unroll limit of 6).
+ In addition, its interesting that the synthesizer can give us different results, even if we don't change the unroll limit (Try to synthesize the above program multiple times with unroll limit of 6).
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
