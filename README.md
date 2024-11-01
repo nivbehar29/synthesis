@@ -61,6 +61,12 @@ Tooltips provide additional information about various elements in the GUI. They 
 
 ## **Usage**
 
+### **Install Dependencies**
+To install dependencies, execute the following command:
+```sh
+pip install -r requirements.txt
+```
+
 ### **Running The GUI**:
 To run the GUI, execute the following command:
 ```sh
